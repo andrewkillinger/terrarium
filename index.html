@@ -2,32 +2,25 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Terrarium</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Terrarium Sandbox</title>
   <style>
-    body,html {margin:0;padding:0;overflow:hidden;background:#000;}
-    #ui {position:fixed;top:0;left:0;z-index:10;color:white;font-family:sans-serif;}
-    .brush {padding:8px;border:1px solid #444;display:inline-block;margin:2px;}
+    body { margin:0; background:#222; overflow:hidden; }
+    #diagnostics { position:absolute; top:0; left:0; background:rgba(0,0,0,0.6); color:#0f0; font:12px monospace; padding:4px; max-height:50vh; overflow:auto; }
+    #brushes { position:absolute; bottom:0; left:0; padding:4px; }
+    #brushes button { margin-right:4px; }
   </style>
 </head>
 <body>
-  <div id="ui"></div>
-  <!-- PixiJS v7 global build -->
+  <div id="app"></div>
+  <div id="brushes"></div>
+  <div id="diagnostics"></div>
+
   <script defer src="https://cdn.jsdelivr.net/npm/pixi.js@7.4.2/dist/pixi.min.js"></script>
-
-  <!-- PixiJS optional filters (UMD bundle that registers on the PIXI global) -->
   <script defer src="https://cdn.jsdelivr.net/npm/pixi-filters@6.1.4/dist/browser/pixi-filters.min.js"></script>
-
-  <!-- Matter.js -->
   <script defer src="https://cdn.jsdelivr.net/npm/matter-js@0.20.0/build/matter.min.js"></script>
-
-  <!-- Behavior3JS -->
   <script defer src="https://cdn.jsdelivr.net/npm/behavior3js@0.2.2/dist/b3.min.js"></script>
-
-  <!-- Howler -->
   <script defer src="https://cdn.jsdelivr.net/npm/howler@2.2.4/dist/howler.min.js"></script>
-
-  <!-- Your app -->
-  <script defer type="module" src="./src/index.js"></script>
+  <script type="module" src="./src/main.js"></script>
 </body>
 </html>

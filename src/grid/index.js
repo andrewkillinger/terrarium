@@ -1,65 +1,64 @@
-const { Graphics } = PIXI;
-
-const WIDTH = 128;
-const HEIGHT = 72;
-const CELL = 4;
-const colors = { 1:0xC2B280, 2:0x4060FF, 3:0x888888, 4:0xFF8000 };
-
-export function createGrid(app) {
-  const data = new Uint8Array(WIDTH * HEIGHT);
-  const gfx = new Graphics();
-  app.stage.addChild(gfx);
-
-  function paint(x, y, type) {
-    if(x<0||y<0||x>=WIDTH||y>=HEIGHT) return;
-    data[x + y*WIDTH] = type;
+export class Grid {
+  constructor(width, height) {
+    this.width = width;
+    this.height = height;
+    this.front = new Array(width * height).fill(null);
+    this.back = new Array(width * height).fill(null);
+    this.waterCount = 0;
   }
-
-  function update() {
-    for(let y=HEIGHT-2; y>=0; y--) {
-      for(let x=0; x<WIDTH; x++) {
-        const i = x + y*WIDTH;
-        const cell = data[i];
-        if(cell===1) { // sand
-          const below = i + WIDTH;
-          if(data[below]===0) { data[below]=1; data[i]=0; }
-          else {
-            const left = below-1;
-            const right = below+1;
-            if(data[left]===0) { data[left]=1; data[i]=0; }
-            else if(data[right]===0) { data[right]=1; data[i]=0; }
+  index(x, y) { return y * this.width + x; }
+  inBounds(x, y) { return x >= 0 && y >= 0 && x < this.width && y < this.height; }
+  get(x, y) { return this.front[this.index(x, y)]; }
+  set(x, y, mat) {
+    const i = this.index(x, y);
+    this.front[i] = mat;
+    this.back[i] = mat;
+  }
+  swap() { [this.front, this.back] = [this.back, this.front]; }
+  tryMove(x, y, dx, dy) {
+    const nx = x + dx, ny = y + dy;
+    if (!this.inBounds(nx, ny)) return false;
+    const ni = this.index(nx, ny);
+    if (this.front[ni] == null) {
+      this.back[ni] = this.front[this.index(x, y)];
+      this.back[this.index(x, y)] = null;
+      return true;
+    }
+    return false;
+  }
+  update(materials) {
+    this.waterCount = 0;
+    const w = this.width, h = this.height;
+    for (let y = h - 1; y >= 0; y--) {
+      for (let x = 0; x < w; x++) {
+        const i = this.index(x, y);
+        const mat = this.front[i];
+        this.back[i] = mat;
+        if (mat === 'SAND') {
+          if (this.tryMove(x, y, 0, 1)) continue;
+          if (this.tryMove(x, y, -1, 1)) continue;
+          if (this.tryMove(x, y, 1, 1)) continue;
+        } else if (mat === 'WATER') {
+          this.waterCount++;
+          if (this.tryMove(x, y, 0, 1)) continue;
+          const dir = Math.random() < 0.5 ? -1 : 1;
+          if (this.tryMove(x, y, dir, 0)) continue;
+          if (this.tryMove(x, y, -dir, 0)) continue;
+        } else if (mat === 'FIRE') {
+          const dirs = [[0,1],[1,0],[-1,0],[0,-1]];
+          for (const [dx, dy] of dirs) {
+            const nx = x + dx, ny = y + dy;
+            if (this.inBounds(nx, ny)) {
+              const t = this.get(nx, ny);
+              if (t === 'SEED' || t === 'PLANT' || t === 'SAND') {
+                this.back[this.index(nx, ny)] = 'FIRE';
+              }
+            }
           }
-        } else if(cell===2) { // water
-          const below = i + WIDTH;
-          if(data[below]===0) { data[below]=2; data[i]=0; }
-          else {
-            const dir = Math.random()<0.5?-1:1;
-            const side = i + dir;
-            if(data[side]===0) { data[side]=2; data[i]=0; }
-          }
-        } else if(cell===4) { // fire
-          if(Math.random()<0.02) data[i]=0;
-          [i-1,i+1,i-WIDTH,i+WIDTH].forEach(n=>{
-            if(data[n]===1||data[n]===2) data[n]=4;
-          });
+          if (Math.random() < 0.02) this.back[i] = 'SOIL';
         }
       }
     }
+    this.swap();
   }
-
-  function render() {
-    gfx.clear();
-    for(let y=0; y<HEIGHT; y++) {
-      for(let x=0; x<WIDTH; x++) {
-        const cell = data[x + y*WIDTH];
-        if(cell>0) {
-          gfx.beginFill(colors[cell]);
-          gfx.drawRect(x*CELL, y*CELL, CELL, CELL);
-          gfx.endFill();
-        }
-      }
-    }
-  }
-
-  return {data, paint, update, render, cellSize:CELL, graphics:gfx};
 }
