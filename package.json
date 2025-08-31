@@ -1,0 +1,32 @@
+{
+  "name": "terrarium",
+  "version": "0.1.0",
+  "description": "Ambient god-sandbox vertical slice",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "pixi.js": "8.12.0",
+    "@pixi/filter-adjustment": "5.1.1",
+    "@pixi/filter-advanced-bloom": "5.1.1",
+    "@pixi/filter-godray": "5.1.1",
+    "@pixi/layers": "2.1.0",
+    "@pixi/lights": "4.1.0",
+    "matter-js": "0.20.0",
+    "matter-attractors": "0.1.6",
+    "matter-wrap": "0.2.0",
+    "behavior3js": "0.2.2",
+    "howler": "2.2.4",
+    "tone": "15.1.22",
+    "pathfinding": "0.4.18",
+    "seedrandom": "3.0.5"
+  },
+  "devDependencies": {
+    "vite": "7.1.3"
+  },
+  "license": "MIT"
+}
