@@ -7,7 +7,7 @@ Minimal vertical slice for a mobile-friendly 2D ambient god-sandbox.
 - [Matter.js](https://github.com/liabru/matter-js) for physics.
 - [Behavior3JS](https://github.com/behavior3/behavior3js) for agent logic.
 - [pixijs/filters](https://github.com/pixijs/filters) for subtle bloom/adjustment.
-- [Howler.js](https://github.com/goldfire/howler.js) and [Tone.js](https://github.com/Tonejs/Tone.js) for audio.
+- [Howler.js](https://github.com/goldfire/howler.js) for audio.
 
 ## Run
 ```bash
@@ -23,7 +23,7 @@ src/
   physics/    // Matter.js world
   grid/       // cellular materials
   agents/     // Behavior3JS trees
-  audio/      // Howler / Tone wiring
+  audio/      // Howler wiring
   ui/         // minimal brush toolbar
 assets/
   sprites/ normal maps/ audio placeholders (.gitkeep only)
