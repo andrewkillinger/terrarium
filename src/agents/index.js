@@ -1,5 +1,5 @@
-import * as b3 from 'behavior3js';
-import { Sprite, Texture } from 'pixi.js';
+const b3 = window.b3;
+const { Sprite, Texture } = PIXI;
 
 class Wander extends b3.Action {
   tick(tick) {

@@ -1,5 +1,5 @@
-import Matter from 'matter-js';
-import { Graphics } from 'pixi.js';
+const Matter = window.Matter;
+const { Graphics } = PIXI;
 
 export function initPhysics(app) {
   const engine = Matter.Engine.create();

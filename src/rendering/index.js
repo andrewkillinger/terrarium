@@ -1,9 +1,5 @@
-import { Application } from 'pixi.js';
-import { AdjustmentFilter } from '@pixi/filter-adjustment';
-import { AdvancedBloomFilter } from '@pixi/filter-advanced-bloom';
-
 export function initRenderer() {
-  const app = new Application({
+  const app = new PIXI.Application({
     width: 512,
     height: 288,
     background: 0x222222,
@@ -18,9 +14,11 @@ export function initRenderer() {
   window.addEventListener('resize', resize);
   resize();
 
-  const adj = new AdjustmentFilter({ gamma: 1.05 });
-  const bloom = new AdvancedBloomFilter();
-  app.stage.filters = [adj, bloom];
+  const filters = PIXI.filters || {};
+  const fx = [];
+  if (filters.AdjustmentFilter) fx.push(new filters.AdjustmentFilter({ gamma: 1.05 }));
+  if (filters.AdvancedBloomFilter) fx.push(new filters.AdvancedBloomFilter());
+  app.stage.filters = fx;
 
   return app;
 }

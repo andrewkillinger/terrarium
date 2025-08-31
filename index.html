@@ -12,19 +12,22 @@
 </head>
 <body>
   <div id="ui"></div>
-  <script type="importmap">
-  {
-    "imports": {
-      "pixi.js": "https://esm.sh/pixi.js@8.12.0",
-      "@pixi/filter-adjustment": "https://esm.sh/@pixi/filter-adjustment@5.1.1",
-      "@pixi/filter-advanced-bloom": "https://esm.sh/@pixi/filter-advanced-bloom@5.1.1",
-      "matter-js": "https://esm.sh/matter-js@0.20.0",
-      "howler": "https://esm.sh/howler@2.2.4",
-      "tone": "https://esm.sh/tone@15.1.22",
-      "behavior3js": "https://esm.sh/behavior3js@0.2.2"
-    }
-  }
-  </script>
-  <script type="module" src="./src/main.js"></script>
+  <!-- PixiJS v7 global build -->
+  <script defer src="https://cdn.jsdelivr.net/npm/pixi.js@7.4.2/dist/pixi.min.js"></script>
+
+  <!-- PixiJS optional filters (UMD bundle that registers on the PIXI global) -->
+  <script defer src="https://cdn.jsdelivr.net/npm/pixi-filters@6.1.4/dist/browser/pixi-filters.min.js"></script>
+
+  <!-- Matter.js -->
+  <script defer src="https://cdn.jsdelivr.net/npm/matter-js@0.20.0/build/matter.min.js"></script>
+
+  <!-- Behavior3JS -->
+  <script defer src="https://cdn.jsdelivr.net/npm/behavior3js@0.2.2/dist/b3.min.js"></script>
+
+  <!-- Howler -->
+  <script defer src="https://cdn.jsdelivr.net/npm/howler@2.2.4/dist/howler.min.js"></script>
+
+  <!-- Your app -->
+  <script defer type="module" src="./src/index.js"></script>
 </body>
 </html>
