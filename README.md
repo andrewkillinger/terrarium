@@ -4,7 +4,7 @@ Minimal vertical slice for a mobile-friendly 2D ambient god-sandbox.
 
 ## Stack
 - [PixiJS](https://github.com/pixijs/pixijs) for rendering.
-- [Matter.js](https://github.com/liabru/matter-js) with [matter-attractors](https://github.com/liabru/matter-attractors) and [matter-wrap](https://github.com/liabru/matter-wrap).
+- [Matter.js](https://github.com/liabru/matter-js) for physics.
 - [Behavior3JS](https://github.com/behavior3/behavior3js) for agent logic.
 - [pixijs/filters](https://github.com/pixijs/filters) for subtle bloom/adjustment.
 - [Howler.js](https://github.com/goldfire/howler.js) and [Tone.js](https://github.com/Tonejs/Tone.js) for audio.

@@ -1,10 +1,5 @@
 import Matter from 'matter-js';
-import attractors from 'matter-attractors';
-import wrap from 'matter-wrap';
 import { Graphics } from 'pixi.js';
-
-Matter.use(attractors);
-Matter.use(wrap);
 
 export function initPhysics(app) {
   const engine = Matter.Engine.create();
