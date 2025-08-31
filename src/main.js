@@ -1,111 +1,17 @@
-import { createApp } from './rendering/index.js';
-import { createEngine } from './physics/index.js';
-import { Grid } from './grid/index.js';
-import { AudioManager } from './audio/index.js';
-import { setupBrushUI } from './ui/brush.js';
-import { Villager } from './agents/villager.js';
-
-async function boot() {
-  const appDiv = document.getElementById('app');
-  const diag = document.getElementById('diagnostics');
-  const brushesDiv = document.getElementById('brushes');
-
-  function fail(msg) {
-    appDiv.innerHTML = `<pre style="color:red">${msg}</pre>`;
-    throw new Error(msg);
-  }
-
-  if (!(window.PIXI && PIXI.filters && window.Matter && window.b3 && window.Howl)) {
-    fail('Missing libs: PIXI, PIXI.filters, Matter, b3, Howl required');
-    return;
-  }
-
-  let manifest;
-  try {
-    const res = await fetch('./config/assets.manifest.json');
-    manifest = await res.json();
-  } catch (e) {
-    fail('Failed to load asset manifest');
-    return;
-  }
-
-  if (location.protocol === 'https:') {
-    const mixed = Object.values(manifest).flat().filter(u => u.startsWith('http://'));
-    if (mixed.length) {
-      fail('Mixed content in asset manifest');
-      return;
-    }
-  }
-
-  const assetStatus = {};
-  await Promise.all(Object.values(manifest).flat().map(async url => {
-    try {
-      const res = await fetch(url, { method: 'HEAD' });
-      assetStatus[url] = res.ok ? 'pass' : 'fail';
-    } catch (e) {
-      assetStatus[url] = 'fail';
-    }
-  }));
-
-  const app = createApp();
-  appDiv.appendChild(app.view);
-
-  const foliage = manifest.foliage.slice(0, 3);
-  const textures = await Promise.all(foliage.map(u => PIXI.Assets.load(u)));
-  const tree1 = new PIXI.Sprite(textures[0]);
-  tree1.position.set(100, 200);
-  const tree2 = new PIXI.Sprite(textures[1]);
-  tree2.position.set(200, 200);
-  const leaf = new PIXI.Sprite(textures[2]);
-  leaf.position.set(150, 100);
-  leaf.alpha = 0.7;
-  app.stage.addChild(tree1, tree2, leaf);
-
-  if (PIXI.filters && PIXI.filters.AdvancedBloomFilter) {
-    const bloom = new PIXI.filters.AdvancedBloomFilter();
-    app.stage.filters = [bloom];
-  }
-
-  const engine = createEngine();
-  const rock = Matter.Bodies.circle(300, 100, 20, { restitution: 0.8 });
-  Matter.World.add(engine.world, rock);
-
-  const grid = new Grid(64, 36);
-  setupBrushUI(brushesDiv, grid, app);
-
-  const audio = new AudioManager(manifest);
-  window.addEventListener('pointerdown', () => audio.start(), { once: true });
-
-  const treeData = await fetch('./ai/trees/villager.json').then(r => r.json());
-  const villager = new Villager(engine, grid, treeData);
-
-  const materialsText = await fetch('./data/materials.csv').then(r => r.text());
-  const materials = {};
-  materialsText.trim().split(/\r?\n/).slice(1).forEach(line => {
-    const [id, density, flammability, flow] = line.split(',');
-    materials[id] = { density: +density, flammability: +flammability, flow: +flow };
-  });
-
-  function updateDiagnostics() {
-    const assets = Object.entries(assetStatus).map(([u, s]) => `<div>${s}: ${u}</div>`).join('');
-    diag.innerHTML = `FPS: ${Math.round(app.ticker.FPS)}<br>` +
-      `Bodies: ${engine.world.bodies.length}<br>` +
-      `Grid: ${grid.width}x${grid.height}<br>` +
-      `Visibility: ${document.hidden ? 'hidden' : 'visible'}<br>` +
-      `<details><summary>Assets</summary>${assets}</details>`;
-  }
-
-  document.addEventListener('visibilitychange', () => {
-    app.ticker.maxFPS = document.hidden ? 10 : 60;
-  });
-
-  app.ticker.add(() => {
-    grid.update(materials);
-    audio.update(grid.waterCount);
-    villager.update();
-    Matter.Engine.update(engine, 1000 / 60);
-    updateDiagnostics();
-  });
-}
-
-boot();
+(async function(){
+const caCanvas=document.getElementById('ca'),gameCanvas=document.getElementById('game'),diag=document.getElementById('diag');
+function err(msg){diag.textContent=msg;diag.style.color='#f00';throw msg}
+if(!window.ex||!window.Tone||!caCanvas||!gameCanvas)err('Missing engine or canvases');
+function resize(){const s=Math.min(innerWidth/512,innerHeight/288);document.documentElement.style.setProperty('--scale',s)}
+window.addEventListener('resize',resize);resize();
+const res=await fetch('config/assets.manifest.json');if(!res.ok)err('manifest load fail');const manifest=await res.json();if(location.protocol==='https:'){for(const url of [...Object.values(manifest.images),...Object.values(manifest.audio)])if(url.startsWith('http:'))err('Mixed content: use HTTPS')}
+const textures={},assetStatus={};await Promise.all(Object.entries(manifest.images).map(([k,url])=>new Promise(r=>{const img=new Image();img.crossOrigin='anonymous';img.onload=()=>{textures[k]=img;assetStatus[k]='ok';r()};img.onerror=()=>{assetStatus[k]='fail';r()};img.src=url;})));
+ca.initCA(caCanvas,512,288);ca.stepCA(0);
+audio.initAudio(manifest);const engine=game.initGame(textures);
+let brush=ca.Materials.SAND,size=4,painting=false;document.querySelectorAll('#toolbar button').forEach(b=>b.onclick=()=>{brush=+b.dataset.mat;audio.playClick()});document.getElementById('size').oninput=e=>size=+e.target.value;
+function paintEvt(e){const rect=caCanvas.getBoundingClientRect();const x=Math.floor((e.clientX-rect.left)/rect.width*512);const y=Math.floor((e.clientY-rect.top)/rect.height*288);ca.paint(x,y,brush,size);if(brush===ca.Materials.WATER||brush===ca.Materials.SEED)audio.playPlop()}
+caCanvas.onpointerdown=e=>{painting=true;paintEvt(e)};window.onpointerup=()=>painting=false;caCanvas.onpointermove=e=>{if(painting)paintEvt(e)};
+let hidden=false;document.addEventListener('visibilitychange',()=>{hidden=document.hidden;if(hidden)Tone.Transport.pause();else Tone.Transport.start()});
+engine.on('postupdate',evt=>{if(!hidden){ca.stepCA(evt.delta);audio.updateAudio(ca.getStats());}
+const s=ca.getStats();const assets=Object.entries(assetStatus).map(([k,v])=>`${k}:${v}`).join(' ');diag.textContent=`fps:${game.getFps().toFixed(0)} bodies:${engine.currentScene.actors.length}\nwater:${s.water} sand:${s.sand} plant:${s.plant} fire:${s.fire}\n${assets}`;});
+})();
