@@ -1,8 +1,0 @@
-id,density,flammability,flow
-SAND,2,0,0
-WATER,1,0,1
-STONE,5,0,0
-FIRE,0,1,0
-SOIL,3,0,0
-SEED,1,0,0
-PLANT,1,0,0

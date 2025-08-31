@@ -1,0 +1,6 @@
+html,body{margin:0;height:100%;overflow:hidden;background:#222;font-family:sans-serif}
+#ca,#game{position:absolute;left:50%;top:50%;width:512px;height:288px;transform:translate(-50%,-50%) scale(var(--scale));image-rendering:pixelated}
+#game{z-index:1;pointer-events:none}
+#toolbar{position:fixed;left:0;right:0;bottom:0;display:flex;justify-content:center;gap:.5em;padding:.5em;background:rgba(0,0,0,.5)}
+#toolbar button,#toolbar input{font-size:1rem}
+#diag{position:fixed;top:0;left:0;background:rgba(0,0,0,.5);color:#0f0;font:12px monospace;padding:4px;white-space:pre;pointer-events:none}
