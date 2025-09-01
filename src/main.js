@@ -33,7 +33,12 @@ window.addEventListener('DOMContentLoaded', async () => {
     if (diag) { diag.style.color = 'red'; diag.textContent = 'Error: missing #ca or #game'; }
     return;
   }
-  initCA(ca, 512, 288);
+  function resize() {
+    initCA(ca, window.innerWidth, window.innerHeight);
+  }
+
+  resize();
+  window.addEventListener('resize', resize);
   initGame(game);
   requestAnimationFrame(frame);
 

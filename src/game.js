@@ -1,6 +1,7 @@
 import { setCell, CellType } from './ca.js';
 
 let current = CellType.SAND;
+let brushSize = 4;
 
 // create UI buttons for selecting the active element
 function makeButton(name, type) {
@@ -15,6 +16,18 @@ function makeButton(name, type) {
   return btn;
 }
 
+function makeBrushButton(name, size) {
+  const btn = document.createElement('button');
+  btn.textContent = name;
+  btn.addEventListener('click', () => {
+    brushSize = size;
+    document.querySelectorAll('#brushes button').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+  });
+  if (size === brushSize) btn.classList.add('active');
+  return btn;
+}
+
 export function initGame(container) {
   // palette on the right similar to sandspiel
   const palette = document.createElement('div');
@@ -22,6 +35,14 @@ export function initGame(container) {
   palette.appendChild(makeButton('Sand', CellType.SAND));
   palette.appendChild(makeButton('Water', CellType.WATER));
   palette.appendChild(makeButton('Erase', CellType.EMPTY));
+
+  const brushes = document.createElement('div');
+  brushes.id = 'brushes';
+  brushes.appendChild(makeBrushButton('Small', 2));
+  brushes.appendChild(makeBrushButton('Medium', 4));
+  brushes.appendChild(makeBrushButton('Large', 8));
+  palette.appendChild(brushes);
+
   container.appendChild(palette);
 
   const canvas = document.getElementById('ca');
@@ -33,7 +54,7 @@ export function initGame(container) {
     const rect = canvas.getBoundingClientRect();
     const x = Math.floor((e.clientX - rect.left) * (canvas.width / rect.width));
     const y = Math.floor((e.clientY - rect.top) * (canvas.height / rect.height));
-    const size = 4; // simple brush size
+    const size = brushSize;
     for (let dy = -size; dy <= size; dy++) {
       for (let dx = -size; dx <= size; dx++) {
         if (dx * dx + dy * dy <= size * size) {
@@ -46,6 +67,18 @@ export function initGame(container) {
   canvas.addEventListener('mousedown', e => { drawing = true; draw(e); });
   canvas.addEventListener('mousemove', draw);
   window.addEventListener('mouseup', () => { drawing = false; });
+
+  canvas.addEventListener('touchstart', e => {
+    drawing = true;
+    e.preventDefault();
+    draw(e.touches[0]);
+  });
+  canvas.addEventListener('touchmove', e => {
+    if (!drawing) return;
+    e.preventDefault();
+    draw(e.touches[0]);
+  });
+  window.addEventListener('touchend', () => { drawing = false; });
 }
 
 export function updateGame() {
