@@ -1,28 +1,33 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="utf-8" />
-<meta name="viewport" content="width=device-width,initial-scale=1" />
+<meta charset="UTF-8">
 <title>Terrarium</title>
-<link rel="stylesheet" href="styles.css" />
+<link rel="stylesheet" href="./styles.css">
+</head>
+<body>
+<div id="phone">
+  <canvas id="ca" width="512" height="288"></canvas>
+  <canvas id="game" width="512" height="288"></canvas>
+</div>
+<div id="ui">
+  brush <select id="brush">
+    <option value="1">Sand</option>
+    <option value="2">Water</option>
+    <option value="3">Stone</option>
+    <option value="7">Fire</option>
+    <option value="5">Seed</option>
+  </select>
+  size <input id="size" type="range" min="1" max="10" value="4">
+</div>
+<div id="diag"></div>
+<button id="tapstart" aria-label="Start">Tap to start</button>
+
 <script defer src="https://cdn.jsdelivr.net/npm/excalibur@0.29.0/dist/excalibur.min.js"></script>
 <script defer src="https://cdn.jsdelivr.net/npm/tone@14.7.77/build/Tone.min.js"></script>
 <script defer src="./src/ca.js"></script>
 <script defer src="./src/audio.js"></script>
 <script defer src="./src/game.js"></script>
 <script defer src="./src/main.js"></script>
-</head>
-<body>
-<canvas id="ca" width="512" height="288"></canvas>
-<canvas id="game" width="512" height="288"></canvas>
-<div id="toolbar">
-  <button data-mat="1">Sand</button>
-  <button data-mat="2">Water</button>
-  <button data-mat="3">Stone</button>
-  <button data-mat="7">Fire</button>
-  <button data-mat="5">Seed</button>
-  <input id="size" type="range" min="1" max="20" value="4" />
-</div>
-<div id="diag"></div>
 </body>
 </html>

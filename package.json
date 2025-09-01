@@ -1,0 +1,11 @@
+{
+  "name": "terrarium",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "engines": { "node": ">=18" },
+  "scripts": {
+    "test": "node scripts/smoke-test.mjs",
+    "test:assets": "ASSET_CHECK=1 node scripts/smoke-test.mjs"
+  }
+}
