@@ -32,6 +32,7 @@ module.exports = {
       "styles.css",
       "manifest.json",
       "assets/*",
+      "config/*",
     ]),
     new HtmlWebpackPlugin({ template: "index.html" }),
     new GenerateSW({
