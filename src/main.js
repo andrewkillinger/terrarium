@@ -1,64 +1,57 @@
-import { initCA, stepCA, drawCA, getTicks } from './ca.js';
-import { initGame, updateGame } from './game.js';
+import { initCA, stepCA, getTicks } from './ca.js';
+import { initGame } from './game.js';
 import { initAudio } from './audio.js';
-import manifest from '../manifest.json' assert { type: 'json' };
+
+async function loadManifest() {
+  try {
+    const res = await fetch('./config/assets.manifest.json', { cache: 'no-cache' });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    return await res.json();
+  } catch (e) {
+    console.warn('Manifest load failed, continuing with placeholders:', e);
+    return { images: {}, audio: {} };
+  }
+}
 
 const diag = document.getElementById('diag');
 const overlay = document.getElementById('overlay');
-let lastTime = performance.now();
-let fps = 0;
+let last = performance.now();
 
-function startLoop() {
-  function frame(now) {
-    stepCA();
-    updateGame();
-    drawCA();
-    const ticks = getTicks();
-    const delta = now - lastTime;
-    fps = delta > 0 ? 1000 / delta : 0;
-    lastTime = now;
-    if (diag) {
-      diag.textContent = `Diagnostics: ticks=${ticks} fps=${fps.toFixed(1)}`;
-    }
-    requestAnimationFrame(frame);
+function frame(now) {
+  const dt = now - last; last = now;
+  stepCA(dt);
+  if (diag) {
+    const fps = (1000 / Math.max(1, dt));
+    diag.textContent = `Diagnostics: ticks=${getTicks()} fps=${fps.toFixed(0)}`;
   }
   requestAnimationFrame(frame);
 }
 
-async function enableAudioOnce() {
-  try {
-    if (window.Tone && Tone.context.state !== 'running') {
-      await Tone.start();
-    }
-  } catch (e) {
-    console.warn('Audio unlock failed, continuing without sound', e);
-  }
-  initAudio(manifest.audio);
-  if (overlay) overlay.remove();
-  window.removeEventListener('pointerdown', enableAudioOnce, true);
-  window.removeEventListener('touchstart', enableAudioOnce, true);
-  window.removeEventListener('keydown', enableAudioOnce, true);
-}
-
-window.addEventListener('pointerdown', enableAudioOnce, true);
-window.addEventListener('touchstart', enableAudioOnce, true);
-window.addEventListener('keydown', enableAudioOnce, true);
-
-if (navigator.userActivation?.hasBeenActive) {
-  enableAudioOnce();
-}
-
-window.addEventListener('DOMContentLoaded', () => {
-  const caCanvas = document.getElementById('ca');
-  const gameEl = document.getElementById('game');
-  if (!caCanvas || !gameEl) {
-    if (diag) {
-      diag.style.color = 'red';
-      diag.textContent = 'Error: missing #ca or #game element';
-    }
+window.addEventListener('DOMContentLoaded', async () => {
+  const ca = document.getElementById('ca');
+  const game = document.getElementById('game');
+  if (!ca || !game) {
+    if (diag) { diag.style.color = 'red'; diag.textContent = 'Error: missing #ca or #game'; }
     return;
   }
-  initCA(caCanvas, 512, 288);
-  initGame(gameEl);
-  startLoop();
+  initCA(ca, 512, 288);
+  initGame(game);
+  requestAnimationFrame(frame);
+
+  const manifest = await loadManifest();
+
+  async function enableAudioOnce() {
+    try { if (window.Tone && Tone.context.state !== 'running') await Tone.start(); }
+    catch (e) { console.warn('Audio unlock failed:', e); }
+    initAudio(manifest.audio);
+    overlay?.remove();
+    window.removeEventListener('pointerdown', enableAudioOnce, true);
+    window.removeEventListener('touchstart', enableAudioOnce, true);
+    window.removeEventListener('keydown', enableAudioOnce, true);
+  }
+
+  window.addEventListener('pointerdown', enableAudioOnce, true);
+  window.addEventListener('touchstart', enableAudioOnce, true);
+  window.addEventListener('keydown', enableAudioOnce, true);
+  if (navigator.userActivation?.hasBeenActive) enableAudioOnce();
 });
