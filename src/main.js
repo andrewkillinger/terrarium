@@ -14,7 +14,6 @@ async function loadManifest() {
 }
 
 const diag = document.getElementById('diag');
-const overlay = document.getElementById('overlay');
 let last = performance.now();
 
 function frame(now) {
@@ -39,19 +38,10 @@ window.addEventListener('DOMContentLoaded', async () => {
   requestAnimationFrame(frame);
 
   const manifest = await loadManifest();
-
-  async function enableAudioOnce() {
-    try { if (window.Tone && Tone.context.state !== 'running') await Tone.start(); }
-    catch (e) { console.warn('Audio unlock failed:', e); }
-    initAudio(manifest.audio);
-    overlay?.remove();
-    window.removeEventListener('pointerdown', enableAudioOnce, true);
-    window.removeEventListener('touchstart', enableAudioOnce, true);
-    window.removeEventListener('keydown', enableAudioOnce, true);
+  try {
+    if (window.Tone && Tone.context.state !== 'running') await Tone.start();
+  } catch (e) {
+    console.warn('Audio unlock failed:', e);
   }
-
-  window.addEventListener('pointerdown', enableAudioOnce, true);
-  window.addEventListener('touchstart', enableAudioOnce, true);
-  window.addEventListener('keydown', enableAudioOnce, true);
-  if (navigator.userActivation?.hasBeenActive) enableAudioOnce();
+  initAudio(manifest.audio);
 });
