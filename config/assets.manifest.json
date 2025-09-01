@@ -1,16 +1,20 @@
 {
   "images": {
-    "foliage.default.001": "https://killinger.synology.me/images/kenney_foliage-pack/PNG/Default%20size/foliagePack_001.png",
-    "foliage.default.002": "https://killinger.synology.me/images/kenney_foliage-pack/PNG/Default%20size/foliagePack_002.png",
-    "foliage.leaves.010": "https://killinger.synology.me/images/kenney_foliage-pack/PNG/Leaves/foliagePack_leaves_010.png"
+    "foliagePack_001": "https://killinger.synology.me/images/foliagePack_001.png",
+    "foliagePack_002": "https://killinger.synology.me/images/foliagePack_002.png",
+    "foliagePack_leaves_010": "https://killinger.synology.me/images/foliagePack_leaves_010.png"
   },
   "audio": {
-    "ambient.day": "https://killinger.synology.me/audio/Memoraphile%20-%20Up%20in%20the%20Sky.ogg",
-    "ambient.cave": "https://killinger.synology.me/audio/dungeon_ambient_1.ogg",
-    "weather.rain": "https://killinger.synology.me/audio/Rain%20OGG/1.ogg",
-    "ui.click": "https://killinger.synology.me/audio/qubodup-click/qubodup-click1.wav",
-    "sfx.plop": "https://killinger.synology.me/audio/3pops/pop2.ogg",
-    "sfx.waterLoop": "https://killinger.synology.me/audio/sfx_100_v2/sfx100v2_loop_water_01.ogg",
-    "sfx.thunder": "https://killinger.synology.me/audio/sfx_100_v2/sfx100v2_thunder_01.ogg"
+    "ambient": {
+      "day": "https://killinger.synology.me/audio/Memoraphile%20-%20Up%20in%20the%20Sky.ogg",
+      "dungeon": "https://killinger.synology.me/audio/dungeon_ambient_1.ogg"
+    },
+    "weather": {
+      "rain": "https://killinger.synology.me/audio/Rain%20OGG/1.ogg"
+    },
+    "sfx": {
+      "click": "https://killinger.synology.me/audio/qubodup-click1.wav",
+      "plop": "https://killinger.synology.me/audio/3pops/pop2.ogg"
+    }
   }
 }
