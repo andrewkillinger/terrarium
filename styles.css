@@ -1,6 +1,0 @@
-html,body{height:100%;margin:0;background:#222;color:#fff;font-family:sans-serif;}
-#phone{position:relative;width:512px;height:288px;max-width:100vw;max-height:100vh;margin:auto;}
-#phone canvas{position:absolute;top:0;left:0;width:100%;height:100%;image-rendering:pixelated;}
-#game{z-index:1;}
-#ui{position:fixed;bottom:10px;left:50%;transform:translateX(-50%);background:rgba(255,255,255,0.8);padding:4px;color:#000;}
-#diag{position:fixed;top:0;left:0;font:12px monospace;color:#0f0;background:rgba(0,0,0,0.5);padding:2px 4px;pointer-events:none;}
