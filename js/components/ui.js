@@ -1,6 +1,5 @@
 import React from "react";
 import { Link } from "react-router-dom";
-import * as Sentry from "@sentry/browser";
 
 import { memory } from "../../crate/pkg/sandtable_bg";
 import { Species } from "../../crate/pkg/sandtable";
@@ -188,7 +187,7 @@ class Index extends React.Component {
     postList = postList.filter((post) => Date.now() - 1000 * 60 * 5 < post);
 
     if (postList.length >= 3) {
-      Sentry.captureMessage("RATELIMIT");
+      console.warn("RATELIMIT");
       return true;
     }
     return false;
