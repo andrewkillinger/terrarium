@@ -29,7 +29,7 @@ module.exports = {
     new WasmPackPlugin({ crateDirectory: path.resolve(__dirname, "crate") }),
     new CopyWebpackPlugin([
       "index.html",
-      "js/styles.css",
+      "styles.css",
       "manifest.json",
       "assets/*",
     ]),

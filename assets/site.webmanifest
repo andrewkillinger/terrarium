@@ -1,0 +1,16 @@
+{
+  "name": "Terrarium",
+  "short_name": "Terrarium",
+  "start_url": "/terrarium/",
+  "scope": "/terrarium/",
+  "display": "standalone",
+  "background_color": "#111111",
+  "theme_color": "#111111",
+  "icons": [
+    {
+      "src": "http://killinger.synology.me/images/Test_Image.png",
+      "sizes": "144x144",
+      "type": "image/png"
+    }
+  ]
+}
