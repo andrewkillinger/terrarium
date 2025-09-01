@@ -1,10 +1,6 @@
 let samples = 600;
 
-window.dataLayer = window.dataLayer || [];
-
-function gtag() {
-  dataLayer.push(arguments);
-}
+// removed analytics tracking
 
 const fps = new (class {
   constructor() {
@@ -39,31 +35,7 @@ const fps = new (class {
     let mean = sum / this.frames.length;
     samples--;
     if (samples === 0) {
-      console.log(`sending fps ${Math.round(mean)} to ga`);
-      gtag("event", "fps", {
-        value: Math.round(mean),
-      });
-      if (mean < 50) {
-        gtag("event", "fps-L50", {
-          value: Math.round(mean),
-        });
-      }
-
-      if (mean < 40) {
-        gtag("event", "fps-L40", {
-          value: Math.round(mean),
-        });
-      }
-      if (mean < 30) {
-        gtag("event", "fps-L30", {
-          value: Math.round(mean),
-        });
-      }
-      if (mean < 20) {
-        gtag("event", "fps-L20", {
-          value: Math.round(mean),
-        });
-      }
+      console.log(`fps ${Math.round(mean)}`);
     }
     // Render the statistics.
     this.fps.textContent = `FPS:${Math.round(mean)}`;
