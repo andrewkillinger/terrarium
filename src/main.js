@@ -7,7 +7,10 @@ document.addEventListener('DOMContentLoaded',()=>{
  if(!ca||!game||ca.width!==512||ca.height!==288||game.width!==512||game.height!==288){error('Missing engine or canvases');return;}
  ca.getContext('2d').fillStyle='#555';ca.getContext('2d').fillRect(0,0,512,288);
  game.getContext('2d').fillStyle='#555';game.getContext('2d').fillRect(0,0,512,288);
- fetch('./config/assets.manifest.json').then(r=>r.json()).then(man=>{
+ fetch('./config/assets.manifest.json').then(r=>{
+  if(!r.ok) throw new Error(`HTTP ${r.status}`);
+  return r.json();
+ }).then(man=>{
   if(location.protocol==='https:'){
    const urls=JSON.stringify(man);
    if(urls.indexOf('"http:')>-1){error('Mixed content');return;}
