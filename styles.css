@@ -19,7 +19,7 @@ body,
   width: 100%;
   height: calc(100% - 2px);
   /* background-color: rgba(00, 00, 00, 0.2); */
-  background-color: #f3f3f4;
+  background-color: #f4d9d8; /* soft pink like sandspiel */
 }
 
 #diag {
@@ -489,4 +489,19 @@ img {
 }
 .reversed {
   transform: rotate(180deg);
+}
+
+/* Palette used by the minimal demo in this kata */
+#palette {
+  position: absolute;
+  top: 20px;
+  right: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  z-index: 2;
+}
+
+#palette button {
+  width: 80px;
 }
