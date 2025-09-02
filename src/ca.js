@@ -22,6 +22,7 @@ const colours = {
 
 let cells;
 let velocities;
+let waterDirs;
 const GRAVITY = 0.5;
 const MAX_VEL = 5;
 
@@ -34,6 +35,7 @@ export function initCA(canvas, w, h) {
   ctx = canvas.getContext('2d');
   cells = new Uint8Array(w * h);
   velocities = new Float32Array(w * h);
+  waterDirs = new Int8Array(w * h);
   drawCA();
 }
 
@@ -41,6 +43,9 @@ function swap(i1, i2) {
   const tmp = cells[i1];
   cells[i1] = cells[i2];
   cells[i2] = tmp;
+  const dtmp = waterDirs[i1];
+  waterDirs[i1] = waterDirs[i2];
+  waterDirs[i2] = dtmp;
 }
 
 export function stepCA(dt = 16) {
@@ -91,30 +96,65 @@ export function stepCA(dt = 16) {
             velocities[i] = 0;
           }
         } else if (cell === WATER) {
-          // Water should conserve mass and flow naturally. The previous
-          // implementation spawned extra "splash" particles above bodies of
-          // water, which caused it to rapidly fill the entire simulation. By
-          // removing that behaviour and only allowing movement into empty
-          // neighbouring cells, water now falls under gravity and pools
-          // realistically.
+          // Heuristic water flow inspired by sandspiel's `update_water` logic.
+          // Water first tries to fall straight down, then diagonally, and if
+          // blocked will slide horizontally. Each water cell remembers the last
+          // horizontal direction it moved in so that streams tend to keep their
+          // momentum.
 
-          const dir = Math.random() < 0.5 ? -1 : 1;
-          for (let step = 1; step <= 3; step++) {
-            const nx = x + dir * step;
-            if (nx < 0 || nx >= width) break;
-            const ni = y * width + nx;
+          const dir = waterDirs[i] || (Math.random() < 0.5 ? -1 : 1);
+          const belowCell = cells[below];
+          if (belowCell === EMPTY) {
+            swap(i, below);
+            velocities[below] = velocities[i];
+            velocities[i] = 0;
+            waterDirs[below] = dir;
+            continue;
+          }
+
+          // try diagonal in preferred direction first, then the other
+          let moved = false;
+          for (const d of [dir, -dir]) {
+            const nx = x + d;
+            if (nx < 0 || nx >= width) continue;
+            const ni = i + d;
             const bi = ni + width;
             if (cells[bi] === EMPTY) {
               swap(i, bi);
               velocities[bi] = velocities[i];
               velocities[i] = 0;
-              break;
-            } else if (cells[ni] === EMPTY) {
-              swap(i, ni);
-              velocities[ni] = velocities[i];
-              velocities[i] = 0;
+              waterDirs[bi] = d;
+              moved = true;
               break;
             }
+            if (cells[ni] === EMPTY) {
+              swap(i, ni);
+              waterDirs[ni] = d;
+              moved = true;
+              break;
+            }
+          }
+          if (moved) continue;
+
+          // slide horizontally up to two cells, preferring stored direction
+          for (const d of [dir, -dir]) {
+            const nx = x + d;
+            const nx2 = x + d * 2;
+            if (nx2 >= 0 && nx2 < width && cells[i + d] === EMPTY && cells[i + 2 * d] === EMPTY) {
+              swap(i, i + 2 * d);
+              waterDirs[i + 2 * d] = d;
+              moved = true;
+              break;
+            }
+            if (nx >= 0 && nx < width && cells[i + d] === EMPTY) {
+              swap(i, i + d);
+              waterDirs[i + d] = d;
+              moved = true;
+              break;
+            }
+          }
+          if (!moved) {
+            waterDirs[i] = -dir; // bump and change direction
           }
         }
       }
@@ -146,7 +186,9 @@ export function getTicks() {
 export function setCell(x, y, type) {
   if (!cells) return;
   if (x < 0 || x >= width || y < 0 || y >= height) return;
-  cells[y * width + x] = type;
+  const i = y * width + x;
+  cells[i] = type;
+  waterDirs[i] = 0;
 }
 
 export const CellType = { EMPTY, SAND, WATER };
