@@ -1,5 +1,5 @@
 {
-  "name": "sandtable",
+  "name": "terrarium",
   "version": "1.0.0",
   "description": "",
   "main": "index.js",
@@ -11,7 +11,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/maxbittker/sandtable.git"
+    "url": "git+https://github.com/maxbittker/terrarium.git"
   },
   "keywords": [
     "webassembly",

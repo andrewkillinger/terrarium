@@ -1,11 +1,11 @@
 {
-  "name": "Sandspiel",
-  "short_name": "Sandspiel",
+  "name": "Terrarium",
+  "short_name": "Terrarium",
   "theme_color": "#2196f3",
   "background_color": "#f3e6e6",
   "display": "standalone",
-  "Scope": "https://sandspiel.club/",
-  "start_url": "https://sandspiel.club/",
+  "Scope": "./",
+  "start_url": "./",
   "icons": [],
   "splash_pages": null
 }
