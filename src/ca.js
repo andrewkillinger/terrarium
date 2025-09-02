@@ -91,12 +91,13 @@ export function stepCA(dt = 16) {
             velocities[i] = 0;
           }
         } else if (cell === WATER) {
-          if (cells[below] === WATER) {
-            const splashPos = i - width + (Math.random() < 0.5 ? -1 : 1);
-            if (splashPos >= 0 && splashPos < cells.length && cells[splashPos] === EMPTY) {
-              cells[splashPos] = WATER;
-            }
-          }
+          // Water should conserve mass and flow naturally. The previous
+          // implementation spawned extra "splash" particles above bodies of
+          // water, which caused it to rapidly fill the entire simulation. By
+          // removing that behaviour and only allowing movement into empty
+          // neighbouring cells, water now falls under gravity and pools
+          // realistically.
+
           const dir = Math.random() < 0.5 ? -1 : 1;
           for (let step = 1; step <= 3; step++) {
             const nx = x + dir * step;
