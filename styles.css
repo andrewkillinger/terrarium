@@ -506,8 +506,24 @@ img {
 }
 
 #brushes {
-  margin-top: 10px;
+  position: fixed;
+  top: 10px;
+  left: 50%;
+  transform: translateX(-50%);
   display: flex;
-  flex-direction: column;
-  gap: 4px;
+  gap: 8px;
+  z-index: 2;
+}
+
+#brushes button {
+  border: 2px solid #555;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.1);
+  padding: 0;
+  cursor: pointer;
+}
+
+#brushes button.active {
+  border-color: #fff;
+  background: rgba(0, 0, 0, 0.3);
 }

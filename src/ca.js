@@ -21,6 +21,9 @@ const colours = {
 };
 
 let cells;
+let velocities;
+const GRAVITY = 0.5;
+const MAX_VEL = 5;
 
 export function initCA(canvas, w, h) {
   if (!canvas) return;
@@ -30,6 +33,7 @@ export function initCA(canvas, w, h) {
   canvas.height = h;
   ctx = canvas.getContext('2d');
   cells = new Uint8Array(w * h);
+  velocities = new Float32Array(w * h);
   drawCA();
 }
 
@@ -39,42 +43,75 @@ function swap(i1, i2) {
   cells[i2] = tmp;
 }
 
-export function stepCA() {
+export function stepCA(dt = 16) {
   if (!cells) return;
   ticks++;
-  // update from bottom to top so particles fall correctly
+  const acc = GRAVITY * dt / 16;
   for (let y = height - 2; y >= 0; y--) {
     for (let x = 0; x < width; x++) {
       const i = y * width + x;
       const cell = cells[i];
-      if (cell === SAND) {
+      if (cell === SAND || cell === WATER) {
         const below = i + width;
-        if (cells[below] === EMPTY) {
+        if (cell === SAND && cells[below] === WATER) {
           swap(i, below);
-        } else {
+          const splash = i + (Math.random() < 0.5 ? -1 : 1);
+          if (splash >= 0 && splash < cells.length && cells[splash] === EMPTY) {
+            cells[splash] = WATER;
+          }
+          velocities[below] = velocities[i];
+          velocities[i] = 0;
+          continue;
+        }
+
+        let v = velocities[i] + acc;
+        if (v > MAX_VEL) v = MAX_VEL;
+        velocities[i] = v;
+        let ny = y;
+        for (let step = 0; step < Math.floor(v); step++) {
+          const belowStep = (ny + 1) * width + x;
+          if (ny + 1 >= height || cells[belowStep] !== EMPTY) break;
+          ny++;
+        }
+        const dest = ny * width + x;
+        if (dest !== i) {
+          swap(i, dest);
+          velocities[dest] = v;
+          velocities[i] = 0;
+          continue;
+        }
+        velocities[i] = 0;
+        if (cell === SAND) {
           const dir = Math.random() < 0.5 ? -1 : 1;
           const nx = x + dir;
           const ni = below + dir;
           if (nx >= 0 && nx < width && cells[ni] === EMPTY) {
             swap(i, ni);
+            velocities[ni] = velocities[i];
+            velocities[i] = 0;
           }
-        }
-      } else if (cell === WATER) {
-        const below = i + width;
-        if (cells[below] === EMPTY) {
-          swap(i, below);
-        } else {
-          const dirs = [-1, 1];
-          if (Math.random() < 0.5) dirs.reverse();
-          for (const dir of dirs) {
-            const nx = x + dir;
-            const ni = i + dir;
-            const bi = below + dir;
-            if (nx >= 0 && nx < width && cells[bi] === EMPTY) {
+        } else if (cell === WATER) {
+          if (cells[below] === WATER) {
+            const splashPos = i - width + (Math.random() < 0.5 ? -1 : 1);
+            if (splashPos >= 0 && splashPos < cells.length && cells[splashPos] === EMPTY) {
+              cells[splashPos] = WATER;
+            }
+          }
+          const dir = Math.random() < 0.5 ? -1 : 1;
+          for (let step = 1; step <= 3; step++) {
+            const nx = x + dir * step;
+            if (nx < 0 || nx >= width) break;
+            const ni = y * width + nx;
+            const bi = ni + width;
+            if (cells[bi] === EMPTY) {
               swap(i, bi);
+              velocities[bi] = velocities[i];
+              velocities[i] = 0;
               break;
-            } else if (nx >= 0 && nx < width && cells[ni] === EMPTY) {
+            } else if (cells[ni] === EMPTY) {
               swap(i, ni);
+              velocities[ni] = velocities[i];
+              velocities[i] = 0;
               break;
             }
           }

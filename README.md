@@ -1,12 +1,12 @@
 <meta charset="utf-8"/>
 
-# sandspiel
+# Terrarium
 
 "Imagine the cool phenomenon when the wind blows the falling leaves. This game simulates the phenomenon with powder (dots)!" -DAN-BALL
 
 This is a [falling sand](https://en.wikipedia.org/wiki/Falling-sand_game) game built in rust (via wasm), webgl, and some JS glueing things together.
 
-You can [play online](https://sandspiel.club) or read [a longer post on the project](https://maxbittker.com/making-sandspiel)
+Terrarium is inspired by the original [sandspiel](https://sandspiel.club); you can read [a longer post on that project](https://maxbittker.com/making-sandspiel).
 
 The goal was to produce an cellular automata environment that's interesting to play with and supports the sharing and forking of fun creations with other players.
 Ultimately, I want the platform to support editing and uploading of your own elements via a programmable cellular automata API.
