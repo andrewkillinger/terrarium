@@ -138,21 +138,29 @@ export function stepCA(dt = 16) {
           }
           if (moved) continue;
 
-          // slide horizontally up to two cells, preferring stored direction
-          for (const d of [dir, -dir]) {
-            const nx = x + d;
-            const nx2 = x + d * 2;
-            if (nx2 >= 0 && nx2 < width && cells[i + d] === EMPTY && cells[i + 2 * d] === EMPTY) {
-              swap(i, i + 2 * d);
-              waterDirs[i + 2 * d] = d;
-              moved = true;
-              break;
-            }
-            if (nx >= 0 && nx < width && cells[i + d] === EMPTY) {
-              swap(i, i + d);
-              waterDirs[i + d] = d;
-              moved = true;
-              break;
+          // pressure-based horizontal search up to three cells, inspired by
+          // the open-source water algorithm in The Powder Toy. This allows
+          // water to flow around obstacles and into small cavities.
+          outer: for (const d of [dir, -dir]) {
+            for (let step = 1; step <= 3; step++) {
+              const nx = x + d * step;
+              if (nx < 0 || nx >= width) continue;
+              const ni = i + d * step;
+              const bi = ni + width;
+              if (cells[ni] === EMPTY && cells[bi] === EMPTY) {
+                swap(i, bi);
+                velocities[bi] = velocities[i];
+                velocities[i] = 0;
+                waterDirs[bi] = d;
+                moved = true;
+                break outer;
+              }
+              if (cells[ni] === EMPTY) {
+                swap(i, ni);
+                waterDirs[ni] = d;
+                moved = true;
+                break outer;
+              }
             }
           }
           if (!moved) {

@@ -232,28 +232,48 @@ pub fn update_water(cell: Cell, mut api: SandApi) {
                 )
             }
         }
-    } else if cell.rb == 0 {
-        if api.get(-dx, 0).species == Species::Empty {
-            // bump
+    } else {
+        // Pressure-based horizontal search inspired by The Powder Toy's water algorithm
+        // (https://github.com/The-Powder-Toy/The-Powder-Toy). Look farther
+        // sideways for open space to allow water to flow around obstacles and
+        // fill small cavities more naturally.
+        for dir in [1, -1] {
+            for dist in 2..=3 {
+                let side = api.get(dir * dist, 0);
+                let below_side = api.get(dir * dist, 1);
+                if side.species == Species::Empty
+                    && (below_side.species == Species::Empty
+                        || below_side.species == Species::Oil)
+                {
+                    api.set(0, 0, below_side);
+                    api.set(dir * dist, 1, Cell { ra: cell.ra, rb: 0, ..cell });
+                    return;
+                }
+            }
+        }
+        if cell.rb == 0 {
+            if api.get(-dx, 0).species == Species::Empty {
+                // bump
+                api.set(
+                    0,
+                    0,
+                    Cell {
+                        ra: ((cell.ra as i32) + dx) as u8,
+                        ..cell
+                    },
+                );
+            }
+        } else {
+            // become less certain (more bumpable)
             api.set(
                 0,
                 0,
                 Cell {
-                    ra: ((cell.ra as i32) + dx) as u8,
+                    rb: cell.rb - 1,
                     ..cell
                 },
             );
         }
-    } else {
-        // become less certain (more bumpable)
-        api.set(
-            0,
-            0,
-            Cell {
-                rb: cell.rb - 1,
-                ..cell
-            },
-        );
     }
     // if api.once_in(8) {
     //     let (dx, dy) = api.rand_vec_8();
