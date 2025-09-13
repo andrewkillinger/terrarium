@@ -23,6 +23,7 @@ const colours = {
 let cells;
 let velocities;
 let waterDirs;
+let imgData;
 const GRAVITY = 0.5;
 const MAX_VEL = 5;
 
@@ -36,6 +37,7 @@ export function initCA(canvas, w, h) {
   cells = new Uint8Array(w * h);
   velocities = new Float32Array(w * h);
   waterDirs = new Int8Array(w * h);
+  imgData = ctx.createImageData(w, h);
   drawCA();
 }
 
@@ -164,18 +166,18 @@ export function stepCA(dt = 16) {
 }
 
 export function drawCA() {
-  if (!ctx || !cells) return;
-  const img = ctx.createImageData(width, height);
+  if (!ctx || !cells || !imgData) return;
+  const data = imgData.data;
   for (let i = 0; i < cells.length; i++) {
     const type = cells[i];
     const colour = colours[type];
     const off = i * 4;
-    img.data[off] = colour[0];
-    img.data[off + 1] = colour[1];
-    img.data[off + 2] = colour[2];
-    img.data[off + 3] = colour[3];
+    data[off] = colour[0];
+    data[off + 1] = colour[1];
+    data[off + 2] = colour[2];
+    data[off + 3] = colour[3];
   }
-  ctx.putImageData(img, 0, 0);
+  ctx.putImageData(imgData, 0, 0);
 }
 
 export function getTicks() {

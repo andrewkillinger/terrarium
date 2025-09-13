@@ -2,6 +2,10 @@ import { initCA, stepCA, getTicks } from './ca.js';
 import { initGame } from './game.js';
 import { initAudio } from './audio.js';
 
+// Size in screen pixels of each simulation pixel. Larger values lower
+// the internal resolution and reduce memory usage.
+const PIXEL_SIZE = 4;
+
 async function loadManifest() {
   try {
     const res = await fetch('./config/assets.manifest.json', { cache: 'no-cache' });
@@ -34,7 +38,11 @@ window.addEventListener('DOMContentLoaded', async () => {
     return;
   }
   function resize() {
-    initCA(ca, window.innerWidth, window.innerHeight);
+    const w = Math.floor(window.innerWidth / PIXEL_SIZE);
+    const h = Math.floor(window.innerHeight / PIXEL_SIZE);
+    ca.style.width = `${window.innerWidth}px`;
+    ca.style.height = `${window.innerHeight}px`;
+    initCA(ca, w, h);
   }
 
   resize();
