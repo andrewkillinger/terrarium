@@ -2,6 +2,8 @@ import { setCell, CellType } from './ca.js';
 
 let current = CellType.SAND;
 let brushSize = 4;
+const brushSizes = [2, 4, 8];
+let brushIndex = brushSizes.indexOf(brushSize);
 
 // create UI buttons for selecting the active element
 function makeButton(name, type) {
@@ -16,18 +18,24 @@ function makeButton(name, type) {
   return btn;
 }
 
-function makeBrushButton(size) {
+function makeBrushToggle() {
   const btn = document.createElement('button');
-  const d = size * 4;
-  btn.style.width = `${d}px`;
-  btn.style.height = `${d}px`;
   btn.style.borderRadius = '50%';
-  btn.addEventListener('click', () => {
+
+  function applySize() {
+    const size = brushSizes[brushIndex];
     brushSize = size;
-    document.querySelectorAll('#brushes button').forEach(b => b.classList.remove('active'));
-    btn.classList.add('active');
+    const d = size * 8; // doubled visual size
+    btn.style.width = `${d}px`;
+    btn.style.height = `${d}px`;
+  }
+
+  btn.addEventListener('click', () => {
+    brushIndex = (brushIndex + 1) % brushSizes.length;
+    applySize();
   });
-  if (size === brushSize) btn.classList.add('active');
+
+  applySize();
   return btn;
 }
 
@@ -41,9 +49,7 @@ export function initGame(container) {
 
   const brushes = document.createElement('div');
   brushes.id = 'brushes';
-  brushes.appendChild(makeBrushButton(2));
-  brushes.appendChild(makeBrushButton(4));
-  brushes.appendChild(makeBrushButton(8));
+  brushes.appendChild(makeBrushToggle());
 
   container.appendChild(brushes);
   container.appendChild(palette);
