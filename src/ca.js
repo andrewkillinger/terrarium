@@ -17,12 +17,20 @@ const WATER = 2;
 const colours = {
   [EMPTY]: [0, 0, 0, 0],
   [SAND]: [194, 178, 128, 255],
-  [WATER]: [64, 164, 223, 255],
+  [WATER]: [100, 100, 255, 255],
 };
+
+const WATER_COLOR_DARK = [50, 50, 145, 255];
+const WATER_COLOR_SHIFT = 0.25;
+const WATER_BRIGHT_INC = (WATER_COLOR_SHIFT * 10) / 110;
+const WATER_DARK_DEC = WATER_COLOR_SHIFT / 110;
 
 let cells;
 let velX;
 let velY;
+let waterDir;
+let waterShade;
+let waterUpdated;
 let imgData;
 const GRAVITY = 0.5;
 const MAX_VEL = 5;
@@ -38,6 +46,9 @@ export function initCA(canvas, w, h) {
   cells = new Uint8Array(w * h);
   velX = new Float32Array(w * h);
   velY = new Float32Array(w * h);
+  waterDir = new Uint8Array(w * h);
+  waterShade = new Float32Array(w * h);
+  waterUpdated = new Uint8Array(w * h);
   imgData = ctx.createImageData(w, h);
   drawCA();
 }
@@ -52,13 +63,14 @@ export function stepCA(dt = 16) {
   if (!cells) return;
   ticks++;
   const acc = GRAVITY * dt / 16;
+  waterUpdated.fill(0);
   for (let y = height - 2; y >= 0; y--) {
     for (let x = 0; x < width; x++) {
       const i = y * width + x;
       const cell = cells[i];
-      if (cell === SAND || cell === WATER) {
+      if (cell === SAND) {
         const below = i + width;
-        if (cell === SAND && cells[below] === WATER) {
+        if (cells[below] === WATER) {
           swap(i, below);
           velX[below] = velX[i];
           velY[below] = velY[i];
@@ -70,7 +82,6 @@ export function stepCA(dt = 16) {
           }
           continue;
         }
-
         let v = velY[i] + acc;
         if (v > MAX_VEL) v = MAX_VEL;
         velY[i] = v;
@@ -90,98 +101,89 @@ export function stepCA(dt = 16) {
           continue;
         }
         velY[i] = 0;
-        if (cell === SAND) {
-          const dir = Math.random() < 0.5 ? -1 : 1;
-          const nx = x + dir;
-          const ni = below + dir;
-          if (nx >= 0 && nx < width && cells[ni] === EMPTY) {
-            swap(i, ni);
-            velX[ni] = velX[i];
-            velY[ni] = velY[i];
-            velX[i] = 0;
-            velY[i] = 0;
-          }
-        } else if (cell === WATER) {
-          // Water fluid dynamics using simple velocity-based momentum. Each
-          // water cell remembers its horizontal velocity and will attempt to
-          // keep flowing in that direction when obstructed.
-
-          let vx = velX[i] * 0.99; // friction
-          if (vx > MAX_HVEL) vx = MAX_HVEL;
-          if (vx < -MAX_HVEL) vx = -MAX_HVEL;
-          velX[i] = vx;
-          const dir = vx !== 0 ? Math.sign(vx) : (Math.random() < 0.5 ? -1 : 1);
-          const belowCell = cells[below];
-          if (belowCell === EMPTY) {
-            swap(i, below);
-            velX[below] = vx;
-            velY[below] = velY[i];
-            velX[i] = 0;
-            velY[i] = 0;
-            continue;
-          }
-
-          // try diagonal in preferred direction first, then the other
-          let moved = false;
-          for (const d of [dir, -dir]) {
-            const nx = x + d;
-            if (nx < 0 || nx >= width) continue;
-            const ni = i + d;
-            const bi = ni + width;
-            if (cells[bi] === EMPTY) {
-              swap(i, bi);
-              velX[bi] = vx + d * 0.5;
-              velY[bi] = velY[i];
-              velX[i] = 0;
-              velY[i] = 0;
-              moved = true;
-              break;
-            }
-            if (cells[ni] === EMPTY) {
-              swap(i, ni);
-              velX[ni] = vx + d * 0.5;
-              velY[ni] = velY[i];
-              velX[i] = 0;
-              velY[i] = 0;
-              moved = true;
-              break;
-            }
-          }
-          if (moved) continue;
-
-          // pressure-based horizontal search up to three cells, inspired by
-          // the open-source water algorithm in The Powder Toy. This allows
-          // water to flow around obstacles and into small cavities.
-          outer: for (const d of [dir, -dir]) {
-            for (let step = 1; step <= 3; step++) {
-              const nx = x + d * step;
-              if (nx < 0 || nx >= width) continue;
-              const ni = i + d * step;
-              const bi = ni + width;
-              if (cells[ni] === EMPTY && cells[bi] === EMPTY) {
-                swap(i, bi);
-                velX[bi] = vx + d * 0.3;
-                velY[bi] = velY[i];
-                velX[i] = 0;
-                velY[i] = 0;
-                moved = true;
-                break outer;
-              }
-              if (cells[ni] === EMPTY) {
-                swap(i, ni);
-                velX[ni] = vx + d * 0.3;
-                velY[ni] = velY[i];
-                velX[i] = 0;
-                velY[i] = 0;
-                moved = true;
-                break outer;
-              }
-            }
-          }
-          if (!moved) {
-            velX[i] = -vx * 0.5; // bump and reverse velocity
-          }
+        const dir = Math.random() < 0.5 ? -1 : 1;
+        const nx = x + dir;
+        const ni = below + dir;
+        if (nx >= 0 && nx < width && cells[ni] === EMPTY) {
+          swap(i, ni);
+          velX[ni] = velX[i];
+          velY[ni] = velY[i];
+          velX[i] = 0;
+          velY[i] = 0;
         }
+      } else if (cell === WATER) {
+        if (waterUpdated[i]) continue;
+        const below = i + width;
+        if (cells[below] === EMPTY) {
+          swap(i, below);
+          waterDir[below] = waterDir[i];
+          waterShade[below] = Math.min(1, waterShade[i] + WATER_BRIGHT_INC);
+          waterDir[i] = 0;
+          waterShade[i] = 0;
+          velX[i] = velY[i] = 0;
+          velX[below] = velY[below] = 0;
+          waterUpdated[below] = 1;
+          continue;
+        }
+        if (x + 1 < width && cells[below + 1] === EMPTY) {
+          swap(i, below + 1);
+          waterDir[below + 1] = waterDir[i];
+          waterShade[below + 1] = Math.min(1, waterShade[i] + WATER_BRIGHT_INC);
+          waterDir[i] = 0;
+          waterShade[i] = 0;
+          velX[i] = velY[i] = 0;
+          velX[below + 1] = velY[below + 1] = 0;
+          waterUpdated[below + 1] = 1;
+          continue;
+        }
+        if (x - 1 >= 0 && cells[below - 1] === EMPTY) {
+          swap(i, below - 1);
+          waterDir[below - 1] = waterDir[i];
+          waterShade[below - 1] = Math.min(1, waterShade[i] + WATER_BRIGHT_INC);
+          waterDir[i] = 0;
+          waterShade[i] = 0;
+          velX[i] = velY[i] = 0;
+          velX[below - 1] = velY[below - 1] = 0;
+          waterUpdated[below - 1] = 1;
+          continue;
+        }
+        if (x - 1 >= 0 && cells[i - 1] === EMPTY && waterDir[i] !== 2) {
+          swap(i, i - 1);
+          waterDir[i - 1] = 1;
+          waterShade[i - 1] = Math.min(1, waterShade[i] + WATER_BRIGHT_INC);
+          waterDir[i] = 0;
+          waterShade[i] = 0;
+          velX[i] = velY[i] = 0;
+          velX[i - 1] = velY[i - 1] = 0;
+          waterUpdated[i - 1] = 1;
+          continue;
+        }
+        if (x + 1 < width && cells[i + 1] === EMPTY && waterDir[i] !== 1) {
+          swap(i, i + 1);
+          waterDir[i + 1] = 2;
+          waterShade[i + 1] = Math.min(1, waterShade[i] + WATER_BRIGHT_INC);
+          waterDir[i] = 0;
+          waterShade[i] = 0;
+          velX[i] = velY[i] = 0;
+          velX[i + 1] = velY[i + 1] = 0;
+          waterUpdated[i + 1] = 1;
+          continue;
+        }
+        if (y > 0 && cells[i - width] === SAND) {
+          swap(i, i - width);
+          waterDir[i - width] = waterDir[i];
+          waterShade[i - width] = waterShade[i];
+          waterDir[i] = 0;
+          waterShade[i] = 0;
+          velX[i] = velY[i] = 0;
+          velX[i - width] = velY[i - width] = 0;
+          waterUpdated[i - width] = 1;
+          continue;
+        }
+        waterShade[i] = Math.max(0, waterShade[i] - WATER_DARK_DEC);
+        waterDir[i] = 0;
+        velX[i] = velY[i] = 0;
+        waterUpdated[i] = 1;
       }
     }
   }
@@ -193,12 +195,20 @@ export function drawCA() {
   const data = imgData.data;
   for (let i = 0; i < cells.length; i++) {
     const type = cells[i];
-    const colour = colours[type];
     const off = i * 4;
-    data[off] = colour[0];
-    data[off + 1] = colour[1];
-    data[off + 2] = colour[2];
-    data[off + 3] = colour[3];
+    if (type === WATER) {
+      const shade = waterShade[i];
+      data[off] = WATER_COLOR_DARK[0] + (colours[WATER][0] - WATER_COLOR_DARK[0]) * shade;
+      data[off + 1] = WATER_COLOR_DARK[1] + (colours[WATER][1] - WATER_COLOR_DARK[1]) * shade;
+      data[off + 2] = WATER_COLOR_DARK[2] + (colours[WATER][2] - WATER_COLOR_DARK[2]) * shade;
+      data[off + 3] = 255;
+    } else {
+      const colour = colours[type];
+      data[off] = colour[0];
+      data[off + 1] = colour[1];
+      data[off + 2] = colour[2];
+      data[off + 3] = colour[3];
+    }
   }
   ctx.putImageData(imgData, 0, 0);
 }
@@ -215,6 +225,9 @@ export function setCell(x, y, type) {
   cells[i] = type;
   velX[i] = 0;
   velY[i] = 0;
+  waterDir[i] = 0;
+  waterShade[i] = type === WATER ? 1 : 0;
+  waterUpdated[i] = 0;
 }
 
 export const CellType = { EMPTY, SAND, WATER };
