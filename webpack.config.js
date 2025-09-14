@@ -2,7 +2,6 @@ const path = require("path");
 const dist = path.resolve(__dirname, "dist");
 
 const CopyWebpackPlugin = require("copy-webpack-plugin");
-const WasmPackPlugin = require("@wasm-tool/wasm-pack-plugin");
 const HtmlWebpackPlugin = require("html-webpack-plugin");
 const { CleanWebpackPlugin } = require("clean-webpack-plugin");
 
@@ -26,7 +25,6 @@ module.exports = {
   devtool: "source-map",
   plugins: [
     new CleanWebpackPlugin(),
-    new WasmPackPlugin({ crateDirectory: path.resolve(__dirname, "crate") }),
     new CopyWebpackPlugin([
       "index.html",
       "styles.css",
@@ -65,6 +63,11 @@ module.exports = {
   ],
   module: {
     rules: [
+      {
+        test: /\.wasm$/,
+        type: "javascript/auto",
+        loader: "wasm-loader",
+      },
       {
         test: /\.(glsl|frag|vert)$/,
         use: "raw-loader",
