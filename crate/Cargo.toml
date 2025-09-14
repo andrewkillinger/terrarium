@@ -31,7 +31,7 @@ opt-level = 3
 lto = true
 
 [package.metadata.wasm-pack.profile.release]
-wasm-opt = ['-O4']
+wasm-opt = false
 
 [dependencies.web-sys]
 version = "0.3"
@@ -40,6 +40,7 @@ features = [
 ]
 
 [dependencies.getrandom]
+version = "0.2"
 features = [
     "js",
 ]
