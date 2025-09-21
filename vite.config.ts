@@ -29,5 +29,23 @@ export default defineConfig(({ mode }) => {
       emptyOutDir: true,
       sourcemap: true,
     },
+    test: {
+      globals: true,
+      environment: 'jsdom',
+      include: ['test/**/*.test.ts', '../test/**/*.test.ts'],
+      coverage: {
+        provider: 'v8',
+        reporter: ['text', 'html'],
+        reportsDirectory: resolve(rootDir, 'coverage'),
+        lines: 70,
+        functions: 70,
+        statements: 70,
+        branches: 60,
+        enabled: true,
+        all: false,
+        include: ['core/services/**/*.ts', 'core/ecs/**/*.ts', 'core/sim/**/*.ts'],
+        exclude: ['**/*.d.ts'],
+      },
+    },
   };
 });
