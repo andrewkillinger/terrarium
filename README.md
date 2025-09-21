@@ -5,8 +5,9 @@ Terrarium is the foundational codebase for a browser-based 16-bit pixel art simu
 ## Features
 
 - ⚙️ **Phaser 3 engine** configured for pixel-perfect rendering (320×240 internal resolution, nearest-neighbor scaling).
-- 🧱 **Modular scene architecture** with boot, preload, and play phases plus a toggleable debug overlay.
-- 🗂️ **Core services** for assets, storage, event messaging, and timekeeping.
+- 🧱 **Modular scene architecture** with boot, preload, and play phases plus a species-agnostic simulation spine.
+- 🕹️ **ECS-lite simulation loop** with deterministic fixed-step timing, system registry, and developer profiling hooks.
+- 🗂️ **Core services** for assets, manifests, storage (with world save slots), event messaging, and timekeeping.
 - 🧪 **Quality tooling** including ESLint, Prettier, TypeScript strict mode, and Vitest unit tests.
 - 🚀 **Vite build + GitHub Pages deployment** with CI workflows for linting, tests, type checking, and builds.
 
@@ -17,7 +18,7 @@ npm install
 npm run dev
 ```
 
-Visit the URL printed in the terminal. You should see the Phaser canvas with a pixel-perfect placeholder sprite and the debug overlay instructions.
+Visit the URL printed in the terminal. You should see the Phaser canvas with a pixel-perfect placeholder sprite and simulation status text.
 
 ### Available Scripts
 
@@ -62,9 +63,15 @@ terrarium/
 └── README.md                # Project overview (this file)
 ```
 
-## Debug Overlay
+## Developer Panel
 
-Press the **D** key while the game is running to toggle the debug overlay. It displays frame timing information sourced from the core `Time` service and provides placeholders for future diagnostics.
+While running `npm run dev` you can press the backtick key (**`**) to toggle the developer panel. The panel surfaces the simulation tick counter, elapsed simulation time, and per-system profiling data. It also exposes **Pause**, **Play**, **Step**, and **Reset** controls wired into the deterministic fixed-step clock.
+
+The panel and keyboard shortcut are available in development builds only.
+
+## World State Persistence
+
+The `StorageService` exposes `saveWorld(state)`, `loadWorld()`, and `clearWorld()` helpers that serialize deterministic ECS component snapshots. Save files follow the `WORLD_STATE_VERSION` marker defined in `src/core/sim/WorldState.ts` so future changes can be migrated in place. Version `0.1.0` represents the initial save format used in this scaffold.
 
 ## Continuous Integration & Deployment
 

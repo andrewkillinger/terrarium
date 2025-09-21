@@ -7,8 +7,29 @@ export interface TimeTickPayload {
   fps: number;
 }
 
+export interface SimTickPayload {
+  tick: number;
+  elapsedMs: number;
+  deltaMs: number;
+}
+
+export interface SimStatePayload {
+  tick: number;
+  elapsedMs: number;
+  paused: boolean;
+}
+
+export type SimCommandAction = 'pause' | 'resume' | 'step' | 'reset';
+
+export interface SimCommandPayload {
+  action: SimCommandAction;
+}
+
 export interface CoreEvents extends EventMap {
-  'debug:toggle': boolean | undefined;
+  'devpanel:toggle': boolean | undefined;
+  'sim:tick': SimTickPayload;
+  'sim:state': SimStatePayload;
+  'sim:command': SimCommandPayload;
   'time:tick': TimeTickPayload;
 }
 

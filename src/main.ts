@@ -1,13 +1,12 @@
 import Phaser from 'phaser';
 
 import { GameConfig } from '@/game/GameConfig';
-import { DebugOverlay } from '@/ui/overlay/DebugOverlay';
-import { eventBus } from '@/core/services/EventBus';
+import { DevPanel } from '@/ui/overlay/DevPanel';
 
 import '@/styles/index.css';
 
 const game = new Phaser.Game(GameConfig);
-const debugOverlay = new DebugOverlay();
+const devPanel = import.meta.env.DEV ? new DevPanel() : null;
 
 declare global {
   interface Window {
@@ -17,14 +16,8 @@ declare global {
 
 window.terrariumGame = game;
 
-window.addEventListener('keydown', (event: KeyboardEvent) => {
-  if (event.key.toLowerCase() === 'd') {
-    eventBus.emit('debug:toggle', undefined);
-  }
-});
-
 window.addEventListener('beforeunload', () => {
-  debugOverlay.destroy();
+  devPanel?.destroy();
   window.terrariumGame?.destroy(true);
 });
 

@@ -1,3 +1,7 @@
+import type { WorldState } from '@/core/sim/WorldState';
+
+const WORLD_STATE_KEY = 'world-state';
+
 export class StorageService {
   private readonly storage: Storage | null;
   private readonly fallback = new Map<string, string>();
@@ -87,6 +91,18 @@ export class StorageService {
     } else {
       this.fallback.delete(key);
     }
+  }
+
+  saveWorld(state: WorldState): void {
+    this.set(WORLD_STATE_KEY, state);
+  }
+
+  loadWorld(): WorldState | null {
+    return this.get<WorldState>(WORLD_STATE_KEY);
+  }
+
+  clearWorld(): void {
+    this.remove(WORLD_STATE_KEY);
   }
 }
 
