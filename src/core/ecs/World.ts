@@ -3,9 +3,11 @@ import type { EntityId } from '@/core/ecs/EntityId';
 import { createEntityIdGenerator } from '@/core/ecs/EntityId';
 import type { System } from '@/core/ecs/System';
 
+export type ComponentKey = string | symbol;
+
 export class World {
   private readonly entities = new Set<EntityId>();
-  private readonly componentStores = new Map<string, ComponentStore<unknown>>();
+  private readonly componentStores = new Map<ComponentKey, ComponentStore<unknown>>();
   private readonly systems: System[] = [];
   private readonly generateEntityId = createEntityIdGenerator();
 
@@ -45,18 +47,18 @@ export class World {
   }
 
   registerComponentStore<T>(
-    key: string,
+    key: ComponentKey,
     store: ComponentStore<T> = new ComponentStore<T>(),
   ): ComponentStore<T> {
     this.componentStores.set(key, store as ComponentStore<unknown>);
     return store;
   }
 
-  getComponentStore<T>(key: string): ComponentStore<T> | undefined {
+  getComponentStore<T>(key: ComponentKey): ComponentStore<T> | undefined {
     return this.componentStores.get(key) as ComponentStore<T> | undefined;
   }
 
-  getOrCreateComponentStore<T>(key: string): ComponentStore<T> {
+  getOrCreateComponentStore<T>(key: ComponentKey): ComponentStore<T> {
     const existing = this.getComponentStore<T>(key);
     if (existing) {
       return existing;
@@ -65,7 +67,7 @@ export class World {
     return this.registerComponentStore<T>(key);
   }
 
-  getRegisteredComponentKeys(): string[] {
+  getRegisteredComponentKeys(): ComponentKey[] {
     return Array.from(this.componentStores.keys());
   }
 
