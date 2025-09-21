@@ -10,6 +10,12 @@ import type { CoreEvents } from '@/core/types';
 import { SIM_SYSTEMS } from '@/game/systems/Simulation';
 import { setupInput } from '@/game/systems/Input';
 import { RenderingBridge } from '@/game/systems/Rendering';
+import { spawningSystem } from '@/game/systems/Spawning';
+import { garbageCollectSystem } from '@/game/systems/GarbageCollect';
+import { PositionKey } from '@/core/ecs/components/Position';
+import { RenderDotKey } from '@/core/ecs/components/RenderDot';
+import { RenderLabelKey } from '@/core/ecs/components/RenderLabel';
+import { LifetimeKey } from '@/core/ecs/components/Lifetime';
 
 export class GamePlay extends Phaser.Scene {
   private world!: World;
@@ -54,7 +60,14 @@ export class GamePlay extends Phaser.Scene {
     this.world = new World();
     this.rendering = new RenderingBridge(this);
 
+    this.world.registerComponentStore(PositionKey);
+    this.world.registerComponentStore(RenderDotKey);
+    this.world.registerComponentStore(RenderLabelKey);
+    this.world.registerComponentStore(LifetimeKey);
+
+    this.world.addSystem(spawningSystem);
     SIM_SYSTEMS.forEach((system) => this.world.addSystem(system));
+    this.world.addSystem(garbageCollectSystem);
 
     this.clock = new SimClock((dt) => this.stepSimulation(dt), {
       fixedDeltaMs: MS_PER_TICK,
@@ -112,6 +125,7 @@ export class GamePlay extends Phaser.Scene {
 
   private resetWorld(): void {
     this.world.clearEntities();
+    this.rendering.clear();
     if (import.meta.env.DEV) {
       profiling.reset();
       profiling.commit();
