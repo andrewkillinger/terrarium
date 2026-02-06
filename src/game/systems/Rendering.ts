@@ -5,9 +5,7 @@ import type { EntityId } from '@/core/ecs/EntityId';
 import type { World } from '@/core/ecs/World';
 import type { Position } from '@/core/ecs/components/Position';
 import { PositionKey } from '@/core/ecs/components/Position';
-import type { RenderDot } from '@/core/ecs/components/RenderDot';
 import { RenderDotKey } from '@/core/ecs/components/RenderDot';
-import type { RenderLabel } from '@/core/ecs/components/RenderLabel';
 import { RenderLabelKey } from '@/core/ecs/components/RenderLabel';
 
 const DEFAULT_DOT_COLOR = 0xffffff;
@@ -26,7 +24,7 @@ export class RenderingBridge {
   constructor(private readonly scene: Phaser.Scene) {}
 
   sync(world: World): void {
-    const positionStore = world.getComponentStore<Position>(PositionKey);
+    const positionStore = world.getComponentStore(PositionKey);
     if (!positionStore) {
       this.clear();
       return;
@@ -49,7 +47,7 @@ export class RenderingBridge {
   }
 
   private syncDots(world: World, positionStore: ComponentStore<Position>): void {
-    const dotStore = world.getComponentStore<RenderDot>(RenderDotKey);
+    const dotStore = world.getComponentStore(RenderDotKey);
     const active = new Set<EntityId>();
 
     if (dotStore) {
@@ -84,7 +82,7 @@ export class RenderingBridge {
   }
 
   private syncLabels(world: World, positionStore: ComponentStore<Position>): void {
-    const labelStore = world.getComponentStore<RenderLabel>(RenderLabelKey);
+    const labelStore = world.getComponentStore(RenderLabelKey);
     const active = new Set<EntityId>();
 
     if (labelStore) {

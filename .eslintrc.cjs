@@ -21,5 +21,9 @@ module.exports = {
   ignorePatterns: ['dist', 'node_modules', 'coverage'],
   rules: {
     'prettier/prettier': 'error',
+    '@typescript-eslint/no-unused-vars': [
+      'error',
+      { argsIgnorePattern: '^_', varsIgnorePattern: '^_' },
+    ],
   },
 };

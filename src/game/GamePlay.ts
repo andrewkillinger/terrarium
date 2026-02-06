@@ -10,7 +10,7 @@ import type { CoreEvents } from '@/core/types';
 import { SIM_SYSTEMS } from '@/game/systems/Simulation';
 import { setupInput } from '@/game/systems/Input';
 import { RenderingBridge } from '@/game/systems/Rendering';
-import { spawningSystem } from '@/game/systems/Spawning';
+import { createSpawningSystem } from '@/game/systems/Spawning';
 import { garbageCollectSystem } from '@/game/systems/GarbageCollect';
 import { PositionKey } from '@/core/ecs/components/Position';
 import { RenderDotKey } from '@/core/ecs/components/RenderDot';
@@ -21,7 +21,7 @@ export class GamePlay extends Phaser.Scene {
   private world!: World;
   private clock!: SimClock;
   private rendering!: RenderingBridge;
-  private unsubscribeCommand?: () => void;
+  private readonly unsubscribes: Array<() => void> = [];
 
   constructor() {
     super(SCENES.PLAY);
@@ -65,7 +65,8 @@ export class GamePlay extends Phaser.Scene {
     this.world.registerComponentStore(RenderLabelKey);
     this.world.registerComponentStore(LifetimeKey);
 
-    this.world.addSystem(spawningSystem);
+    const spawning = createSpawningSystem();
+    this.world.addSystem(spawning.system);
     SIM_SYSTEMS.forEach((system) => this.world.addSystem(system));
     this.world.addSystem(garbageCollectSystem);
 
@@ -75,12 +76,37 @@ export class GamePlay extends Phaser.Scene {
     });
     this.clock.reset();
 
-    this.unsubscribeCommand = eventBus.on('sim:command', (payload) => this.handleCommand(payload));
+    this.unsubscribes.push(
+      eventBus.on('sim:command', (payload) => this.handleCommand(payload)),
+      eventBus.on('spawn:request', (payload) => {
+        if (payload.kind === 'dot') {
+          spawning.queueSpawn({
+            kind: 'dot',
+            x: payload.x,
+            y: payload.y,
+            radius: payload.radius,
+            color: payload.color,
+            ttl: payload.ttl,
+          });
+        } else {
+          spawning.queueSpawn({
+            kind: 'label',
+            x: payload.x,
+            y: payload.y,
+            text: payload.text ?? '',
+            size: payload.size,
+            color: payload.color,
+            ttl: payload.ttl,
+          });
+        }
+      }),
+      eventBus.on('spawn:clear', () => spawning.queueDespawnAll()),
+    );
 
     setupInput(this);
 
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
-      this.unsubscribeCommand?.();
+      this.unsubscribes.forEach((unsub) => unsub());
     });
   }
 
@@ -89,18 +115,7 @@ export class GamePlay extends Phaser.Scene {
   }
 
   private stepSimulation(dt: number): void {
-    if (import.meta.env.DEV) {
-      for (const system of this.world.getSystems()) {
-        const name = system.displayName ?? system.name ?? 'System';
-        profiling.measure(name, () => {
-          system(dt, this.world);
-        });
-      }
-      profiling.commit();
-    } else {
-      this.world.step(dt);
-    }
-
+    this.world.step(dt, import.meta.env.DEV ? profiling : undefined);
     this.rendering.sync(this.world);
   }
 

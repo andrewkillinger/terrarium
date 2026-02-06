@@ -23,7 +23,7 @@ export class ComponentStore<T> implements Iterable<[EntityId, T]> {
     this.components.clear();
   }
 
-  size(): number {
+  get size(): number {
     return this.components.size;
   }
 

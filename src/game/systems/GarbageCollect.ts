@@ -1,12 +1,9 @@
 import type { EntityId } from '@/core/ecs/EntityId';
 import type { System } from '@/core/ecs/System';
-import type { Lifetime } from '@/core/ecs/components/Lifetime';
 import { LifetimeKey } from '@/core/ecs/components/Lifetime';
 
-export const garbageCollectSystem: System = ((dt, world) => {
-  void dt;
-
-  const lifetimeStore = world.getComponentStore<Lifetime>(LifetimeKey);
+export const garbageCollectSystem: System = ((_dt, world) => {
+  const lifetimeStore = world.getComponentStore(LifetimeKey);
   if (!lifetimeStore) {
     return;
   }

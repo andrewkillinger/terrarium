@@ -18,7 +18,7 @@ export function createEntityIdGenerator(start: EntityId = 0): EntityIdGenerator 
       current = next;
     },
     peek(): EntityId {
-      return current;
+      return current + 1;
     },
   };
 }
