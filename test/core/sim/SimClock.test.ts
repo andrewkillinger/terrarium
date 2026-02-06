@@ -1,13 +1,10 @@
-import { describe, expect, it, vi, beforeEach } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 import { SimClock } from '@/core/sim/SimClock';
 import { EventBus } from '@/core/services/EventBus';
 import type { CoreEvents } from '@/core/types';
 
-const createClock = (options?: {
-  fixedDeltaMs?: number;
-  maxStepsPerFrame?: number;
-}) => {
+const createClock = (options?: { fixedDeltaMs?: number; maxStepsPerFrame?: number }) => {
   const handler = vi.fn();
   const bus = new EventBus<CoreEvents>();
   const clock = new SimClock(handler, options, bus);
@@ -100,9 +97,7 @@ describe('SimClock', () => {
 
       clock.pause();
       expect(clock.isPaused).toBe(true);
-      expect(stateHandler).toHaveBeenCalledWith(
-        expect.objectContaining({ paused: true }),
-      );
+      expect(stateHandler).toHaveBeenCalledWith(expect.objectContaining({ paused: true }));
     });
 
     it('pause is idempotent', () => {
@@ -125,9 +120,7 @@ describe('SimClock', () => {
 
       clock.resume();
       expect(clock.isPaused).toBe(false);
-      expect(stateHandler).toHaveBeenCalledWith(
-        expect.objectContaining({ paused: false }),
-      );
+      expect(stateHandler).toHaveBeenCalledWith(expect.objectContaining({ paused: false }));
     });
 
     it('resume is idempotent', () => {
@@ -179,12 +172,8 @@ describe('SimClock', () => {
 
       expect(clock.tick).toBe(0);
       expect(clock.time).toBe(0);
-      expect(stateHandler).toHaveBeenCalledWith(
-        expect.objectContaining({ tick: 0, elapsedMs: 0 }),
-      );
-      expect(tickHandler).toHaveBeenCalledWith(
-        expect.objectContaining({ tick: 0, deltaMs: 0 }),
-      );
+      expect(stateHandler).toHaveBeenCalledWith(expect.objectContaining({ tick: 0, elapsedMs: 0 }));
+      expect(tickHandler).toHaveBeenCalledWith(expect.objectContaining({ tick: 0, deltaMs: 0 }));
     });
   });
 
