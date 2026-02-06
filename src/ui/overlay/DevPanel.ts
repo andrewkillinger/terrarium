@@ -1,19 +1,11 @@
 import { eventBus } from '@/core/services/EventBus';
 import { profiling } from '@/core/services/Profiling';
 import { GAME_HEIGHT, GAME_WIDTH, SCENES } from '@/core/config';
-import { queueDespawnAll, queueSpawn } from '@/game/systems/Spawning';
 import type Phaser from 'phaser';
 import type { ProfilingService } from '@/core/services/Profiling';
 import type { CoreEvents } from '@/core/types';
 
-type ButtonKey =
-  | 'pause'
-  | 'play'
-  | 'step'
-  | 'reset'
-  | 'spawnDot'
-  | 'spawnLabel'
-  | 'clearAll';
+type ButtonKey = 'pause' | 'play' | 'step' | 'reset' | 'spawnDot' | 'spawnLabel' | 'clearAll';
 
 export class DevPanel {
   private readonly container: HTMLDivElement;
@@ -60,11 +52,7 @@ export class DevPanel {
       this.buttons.step,
       this.buttons.reset,
     );
-    spawnControls.append(
-      this.buttons.spawnDot,
-      this.buttons.spawnLabel,
-      this.buttons.clearAll,
-    );
+    spawnControls.append(this.buttons.spawnDot, this.buttons.spawnLabel, this.buttons.clearAll);
 
     this.container.append(this.stats, simControls, spawnControls, this.timings);
     document.body.appendChild(this.container);
@@ -108,16 +96,23 @@ export class DevPanel {
 
   private spawnDot(): void {
     const { x, y } = this.getSpawnCoordinates();
-    queueSpawn({ kind: 'dot', x, y, radius: 3, color: 0x00ff88 });
+    this.bus.emit('spawn:request', { kind: 'dot', x, y, radius: 3, color: 0x00ff88 });
   }
 
   private spawnLabel(): void {
     const { x, y } = this.getSpawnCoordinates();
-    queueSpawn({ kind: 'label', x, y, text: 'hello', size: 8, color: 0xffff00 });
+    this.bus.emit('spawn:request', {
+      kind: 'label',
+      x,
+      y,
+      text: 'hello',
+      size: 8,
+      color: 0xffff00,
+    });
   }
 
   private clearAll(): void {
-    queueDespawnAll();
+    this.bus.emit('spawn:clear', undefined);
   }
 
   private getSpawnCoordinates(): { x: number; y: number } {
@@ -128,8 +123,13 @@ export class DevPanel {
       const pointerX = pointer?.worldX;
       const pointerY = pointer?.worldY;
 
-      if (Number.isFinite(pointerX) && Number.isFinite(pointerY)) {
-        return { x: Math.round(pointerX!), y: Math.round(pointerY!) };
+      if (
+        typeof pointerX === 'number' &&
+        Number.isFinite(pointerX) &&
+        typeof pointerY === 'number' &&
+        Number.isFinite(pointerY)
+      ) {
+        return { x: Math.round(pointerX), y: Math.round(pointerY) };
       }
 
       const camera = scene.cameras?.main;
@@ -159,25 +159,26 @@ export class DevPanel {
 
   private updateTimings(): void {
     const snapshot = this.profiler.getSnapshot();
-    this.timings.innerHTML = '';
+    const children: HTMLLIElement[] = [];
 
     if (snapshot.systems.length === 0) {
       const item = document.createElement('li');
       item.textContent = 'No systems profiled';
-      this.timings.appendChild(item);
-      return;
+      children.push(item);
+    } else {
+      const totalLabel = document.createElement('li');
+      totalLabel.textContent = `Total ${snapshot.totalMs.toFixed(3)}ms`;
+      totalLabel.className = 'dev-panel__timings-total';
+      children.push(totalLabel);
+
+      snapshot.systems.forEach((entry) => {
+        const item = document.createElement('li');
+        item.textContent = `${entry.name} — ${entry.durationMs.toFixed(3)}ms`;
+        children.push(item);
+      });
     }
 
-    const totalLabel = document.createElement('li');
-    totalLabel.textContent = `Total ${snapshot.totalMs.toFixed(3)}ms`;
-    totalLabel.className = 'dev-panel__timings-total';
-    this.timings.appendChild(totalLabel);
-
-    snapshot.systems.forEach((entry) => {
-      const item = document.createElement('li');
-      item.textContent = `${entry.name} — ${entry.durationMs.toFixed(3)}ms`;
-      this.timings.appendChild(item);
-    });
+    this.timings.replaceChildren(...children);
   }
 
   private emitCommand(action: CoreEvents['sim:command']['action']): void {

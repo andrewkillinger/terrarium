@@ -32,7 +32,7 @@ export default defineConfig(({ mode }) => {
     test: {
       globals: true,
       environment: 'jsdom',
-      include: ['test/**/*.test.ts', '../test/**/*.test.ts'],
+      include: ['../test/**/*.test.ts'],
       coverage: {
         provider: 'v8',
         reporter: ['text', 'html'],

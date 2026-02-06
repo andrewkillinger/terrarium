@@ -1,12 +1,5 @@
 export type EventMap = Record<string, unknown>;
 
-export interface TimeTickPayload {
-  delta: number;
-  elapsed: number;
-  fixedStep: number;
-  fps: number;
-}
-
 export interface SimTickPayload {
   tick: number;
   elapsedMs: number;
@@ -30,7 +23,19 @@ export interface CoreEvents extends EventMap {
   'sim:tick': SimTickPayload;
   'sim:state': SimStatePayload;
   'sim:command': SimCommandPayload;
-  'time:tick': TimeTickPayload;
+  'spawn:request': SpawnRequestPayload;
+  'spawn:clear': undefined;
+}
+
+export interface SpawnRequestPayload {
+  kind: 'dot' | 'label';
+  x: number;
+  y: number;
+  radius?: number;
+  color?: number;
+  text?: string;
+  size?: number;
+  ttl?: number;
 }
 
 declare global {

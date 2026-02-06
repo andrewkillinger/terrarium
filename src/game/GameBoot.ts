@@ -14,9 +14,9 @@ export class GameBoot extends Phaser.Scene {
     this.load.setCORS(manifestService.getCrossOrigin());
   }
 
-  create(): void {
+  async create(): Promise<void> {
     eventBus.clear();
-    void manifestService.init();
+    await manifestService.init();
     const savedState = storageService.loadWorld();
     this.registry.set('world:state', savedState);
     this.cameras.main.setBackgroundColor(BACKGROUND_COLOR);

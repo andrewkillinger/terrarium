@@ -1,15 +1,16 @@
 import { describe, expect, it, beforeEach } from 'vitest';
 
 import { World } from '@/core/ecs/World';
-import { PositionKey, type Position } from '@/core/ecs/components/Position';
-import { RenderDotKey, type RenderDot } from '@/core/ecs/components/RenderDot';
-import { RenderLabelKey, type RenderLabel } from '@/core/ecs/components/RenderLabel';
-import { LifetimeKey, type Lifetime } from '@/core/ecs/components/Lifetime';
-import { queueSpawn, spawningSystem } from '@/game/systems/Spawning';
+import { PositionKey } from '@/core/ecs/components/Position';
+import { RenderDotKey } from '@/core/ecs/components/RenderDot';
+import { RenderLabelKey } from '@/core/ecs/components/RenderLabel';
+import { LifetimeKey } from '@/core/ecs/components/Lifetime';
+import { createSpawningSystem } from '@/game/systems/Spawning';
 import { garbageCollectSystem } from '@/game/systems/GarbageCollect';
 
 describe('Spawning system', () => {
   let world: World;
+  let spawning: ReturnType<typeof createSpawningSystem>;
 
   beforeEach(() => {
     world = new World();
@@ -17,16 +18,17 @@ describe('Spawning system', () => {
     world.registerComponentStore(RenderDotKey);
     world.registerComponentStore(RenderLabelKey);
     world.registerComponentStore(LifetimeKey);
+    spawning = createSpawningSystem();
   });
 
   it('creates entities with expected components from spawn requests', () => {
-    queueSpawn({ kind: 'dot', x: 10, y: 12, radius: 5, color: 0x123456, ttl: 3 });
+    spawning.queueSpawn({ kind: 'dot', x: 10, y: 12, radius: 5, color: 0x123456, ttl: 3 });
 
-    spawningSystem(16, world);
+    spawning.system(16, world);
 
-    const positionStore = world.getComponentStore<Position>(PositionKey)!;
-    const dotStore = world.getComponentStore<RenderDot>(RenderDotKey)!;
-    const lifetimeStore = world.getComponentStore<Lifetime>(LifetimeKey)!;
+    const positionStore = world.getComponentStore(PositionKey)!;
+    const dotStore = world.getComponentStore(RenderDotKey)!;
+    const lifetimeStore = world.getComponentStore(LifetimeKey)!;
 
     const entries = Array.from(positionStore.entries());
     expect(entries).toHaveLength(1);
@@ -38,11 +40,19 @@ describe('Spawning system', () => {
   });
 
   it('removes entities after their lifetime expires', () => {
-    queueSpawn({ kind: 'label', x: 4, y: 6, text: 'hi', size: 10, color: 0xabcdef, ttl: 2 });
+    spawning.queueSpawn({
+      kind: 'label',
+      x: 4,
+      y: 6,
+      text: 'hi',
+      size: 10,
+      color: 0xabcdef,
+      ttl: 2,
+    });
 
-    spawningSystem(16, world);
-    let positionStore = world.getComponentStore<Position>(PositionKey)!;
-    let labelStore = world.getComponentStore<RenderLabel>(RenderLabelKey)!;
+    spawning.system(16, world);
+    const positionStore = world.getComponentStore(PositionKey)!;
+    const labelStore = world.getComponentStore(RenderLabelKey)!;
 
     const entries = Array.from(labelStore.entries());
     expect(entries).toHaveLength(1);
@@ -51,21 +61,20 @@ describe('Spawning system', () => {
     expect(positionStore.get(entityId)).toEqual({ x: 4, y: 6 });
 
     // First tick after spawn - lifetime should decrement but entity remains.
-    spawningSystem(16, world);
+    spawning.system(16, world);
     garbageCollectSystem(16, world);
     expect(world.entityCount).toBe(1);
 
     // Second tick after spawn - entity should still exist (lifetime reaches zero).
-    spawningSystem(16, world);
+    spawning.system(16, world);
     garbageCollectSystem(16, world);
     expect(world.entityCount).toBe(1);
 
     // Third tick - lifetime expired, entity removed.
-    spawningSystem(16, world);
+    spawning.system(16, world);
     garbageCollectSystem(16, world);
     expect(world.entityCount).toBe(0);
 
-    labelStore = world.getComponentStore<RenderLabel>(RenderLabelKey)!;
-    expect(labelStore.size()).toBe(0);
+    expect(labelStore.size).toBe(0);
   });
 });
