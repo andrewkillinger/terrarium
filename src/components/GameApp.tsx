@@ -41,30 +41,10 @@ export default function GameApp() {
     );
   }
 
-  if (game.error) {
-    return (
-      <div className="min-h-screen bg-gray-950 flex items-center justify-center p-4">
-        <div className="text-center">
-          <div className="text-4xl mb-4">⚠️</div>
-          <div className="text-red-400 text-sm mb-2">Failed to load</div>
-          <div className="text-gray-500 text-xs">{game.error}</div>
-          <button
-            onClick={() => window.location.reload()}
-            className="mt-4 bg-blue-600 text-white px-4 py-2 rounded-lg text-sm"
-          >
-            Retry
-          </button>
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div className="h-screen flex flex-col bg-gray-950 text-white">
-      {/* Top resource bar */}
       <ResourceBar cityState={game.cityState} tickCountdown={game.tickCountdown} />
 
-      {/* Main content area */}
       <div className="flex-1 min-h-0">
         {activeTab === 'city' && (
           <CityGrid plots={game.plots} onPlotTap={handlePlotTap} />
@@ -73,17 +53,24 @@ export default function GameApp() {
           <ProjectsPanel
             projects={game.projects}
             cityState={game.cityState}
+            onVote={game.voteProject}
+            onContribute={game.contributeProject}
             onRefresh={game.refreshProjects}
           />
         )}
-        {activeTab === 'chat' && <ChatPanel messages={game.chatMessages} />}
+        {activeTab === 'chat' && (
+          <ChatPanel
+            messages={game.chatMessages}
+            userId={game.userId}
+            onSend={game.sendChat}
+          />
+        )}
         {activeTab === 'activity' && <ActivityPanel actions={game.recentActions} />}
         {activeTab === 'stats' && (
           <StatsPanel plots={game.plots} cityState={game.cityState} />
         )}
       </div>
 
-      {/* Bottom tab bar */}
       <div className="flex border-t border-gray-800 bg-gray-900 pb-safe">
         {TABS.map((tab) => (
           <button
@@ -101,11 +88,12 @@ export default function GameApp() {
         ))}
       </div>
 
-      {/* Plot bottom sheet */}
       <PlotSheet
         plot={selectedPlot}
         cityState={game.cityState}
         onClose={() => setSelectedPlot(null)}
+        onPlace={game.placeBuilding}
+        onUpgrade={game.upgradeBuilding}
         onAction={game.refreshState}
       />
     </div>

@@ -2,15 +2,17 @@
 
 import { useState } from 'react';
 import { Project, CityState } from '@/lib/types';
-import { api } from '@/lib/api';
+import { ActionResult } from '@/lib/local-engine';
 
 interface ProjectsPanelProps {
   projects: Project[];
   cityState: CityState | null;
+  onVote: (projectId: string) => ActionResult;
+  onContribute: (projectId: string, coins: number, wood: number, stone: number) => ActionResult;
   onRefresh: () => void;
 }
 
-export default function ProjectsPanel({ projects, cityState, onRefresh }: ProjectsPanelProps) {
+export default function ProjectsPanel({ projects, cityState, onVote, onContribute, onRefresh }: ProjectsPanelProps) {
   const [contributing, setContributing] = useState<string | null>(null);
   const [amounts, setAmounts] = useState({ coins: 0, wood: 0, stone: 0 });
   const [error, setError] = useState<string | null>(null);
@@ -18,17 +20,17 @@ export default function ProjectsPanel({ projects, cityState, onRefresh }: Projec
   const active = projects.filter((p) => p.status === 'active');
   const past = projects.filter((p) => p.status !== 'active');
 
-  const handleVote = async (projectId: string) => {
-    const res = await api.voteProject(projectId);
+  const handleVote = (projectId: string) => {
+    const res = onVote(projectId);
     if (!res.ok) {
       setError(res.error || 'Failed');
     }
     onRefresh();
   };
 
-  const handleContribute = async (projectId: string) => {
+  const handleContribute = (projectId: string) => {
     setError(null);
-    const res = await api.contributeProject(projectId, amounts.coins, amounts.wood, amounts.stone);
+    const res = onContribute(projectId, amounts.coins, amounts.wood, amounts.stone);
     if (!res.ok) {
       setError(res.error || 'Failed');
     } else {
@@ -57,21 +59,21 @@ export default function ProjectsPanel({ projects, cityState, onRefresh }: Projec
             <div className="mt-2 space-y-1">
               {project.goal_coins > 0 && (
                 <ProgressBar
-                  label="🪙 Coins"
+                  label="Coins"
                   current={project.contributed_coins}
                   goal={project.goal_coins}
                 />
               )}
               {project.goal_wood > 0 && (
                 <ProgressBar
-                  label="🪵 Wood"
+                  label="Wood"
                   current={project.contributed_wood}
                   goal={project.goal_wood}
                 />
               )}
               {project.goal_stone > 0 && (
                 <ProgressBar
-                  label="🪨 Stone"
+                  label="Stone"
                   current={project.contributed_stone}
                   goal={project.goal_stone}
                 />
@@ -82,7 +84,7 @@ export default function ProjectsPanel({ projects, cityState, onRefresh }: Projec
           {project.project_type === 'vote' && (
             <div className="mt-2">
               <ProgressBar
-                label="🗳️ Votes"
+                label="Votes"
                 current={project.vote_count}
                 goal={project.vote_threshold}
               />
@@ -91,12 +93,6 @@ export default function ProjectsPanel({ projects, cityState, onRefresh }: Projec
 
           {project.reward_description && (
             <div className="mt-2 text-xs text-green-400">Reward: {project.reward_description}</div>
-          )}
-
-          {project.deadline && (
-            <div className="mt-1 text-xs text-gray-500">
-              Deadline: {new Date(project.deadline).toLocaleDateString()}
-            </div>
           )}
 
           <div className="flex gap-2 mt-3">
