@@ -2,31 +2,28 @@
 
 import { useState, useRef, useEffect } from 'react';
 import { ChatMessage } from '@/lib/types';
-import { api, getUserIdLocal } from '@/lib/api';
+import { ActionResult } from '@/lib/local-engine';
 
 interface ChatPanelProps {
   messages: ChatMessage[];
+  userId: string | null;
+  onSend: (content: string) => ActionResult;
 }
 
-export default function ChatPanel({ messages }: ChatPanelProps) {
+export default function ChatPanel({ messages, userId, onSend }: ChatPanelProps) {
   const [input, setInput] = useState('');
-  const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
-  const currentUser = getUserIdLocal();
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages.length]);
 
-  const handleSend = async () => {
-    if (!input.trim() || sending) return;
-    setSending(true);
+  const handleSend = () => {
+    if (!input.trim()) return;
     setError(null);
 
-    const res = await api.sendChat(input.trim());
-    setSending(false);
-
+    const res = onSend(input.trim());
     if (res.ok) {
       setInput('');
     } else {
@@ -34,24 +31,16 @@ export default function ChatPanel({ messages }: ChatPanelProps) {
     }
   };
 
-  const handleReport = async (messageId: string) => {
-    const res = await api.reportMessage(messageId, 'Inappropriate');
-    if (!res.ok) {
-      alert(res.error || 'Failed to report');
-    }
-  };
-
   const visibleMessages = messages.filter((m) => !m.deleted);
 
   return (
     <div className="flex flex-col h-full">
-      {/* Messages */}
       <div className="flex-1 overflow-y-auto p-3 space-y-2">
         {visibleMessages.length === 0 && (
           <div className="text-gray-500 text-center text-sm mt-8">No messages yet. Say hello!</div>
         )}
         {visibleMessages.map((msg) => {
-          const isMe = msg.user_id === currentUser;
+          const isMe = msg.user_id === userId;
           return (
             <div
               key={msg.id}
@@ -69,27 +58,15 @@ export default function ChatPanel({ messages }: ChatPanelProps) {
                 )}
                 <div className="break-words">{msg.content}</div>
               </div>
-              <div className="flex items-center gap-2 mt-0.5">
-                <span className="text-[10px] text-gray-500">
-                  {new Date(msg.created_at).toLocaleTimeString()}
-                </span>
-                {!isMe && (
-                  <button
-                    onClick={() => handleReport(msg.id)}
-                    className="text-[10px] text-gray-600 hover:text-red-400"
-                    title="Report message"
-                  >
-                    report
-                  </button>
-                )}
-              </div>
+              <span className="text-[10px] text-gray-500 mt-0.5">
+                {new Date(msg.created_at).toLocaleTimeString()}
+              </span>
             </div>
           );
         })}
         <div ref={bottomRef} />
       </div>
 
-      {/* Input */}
       <div className="border-t border-gray-800 p-3">
         {error && <div className="text-red-400 text-xs mb-1">{error}</div>}
         <div className="flex gap-2">
@@ -104,14 +81,14 @@ export default function ChatPanel({ messages }: ChatPanelProps) {
           />
           <button
             onClick={handleSend}
-            disabled={sending || !input.trim()}
+            disabled={!input.trim()}
             className="bg-blue-600 rounded-lg px-4 py-2 text-sm font-medium text-white disabled:opacity-50 hover:bg-blue-500 transition-colors"
           >
             Send
           </button>
         </div>
         <div className="text-[10px] text-gray-600 mt-1">
-          {input.length}/240 &middot; Rate limit: 1 msg per 3s
+          {input.length}/240
         </div>
       </div>
     </div>

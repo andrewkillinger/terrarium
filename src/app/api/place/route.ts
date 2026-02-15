@@ -4,7 +4,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { getUserId } from '@/lib/auth';
-import { getServiceClient } from '@/lib/supabase/server';
+import { getDbOrError } from '@/lib/supabase/server';
 import { BUILDING_DEFS, canAfford, GRID_SIZE } from '@/lib/buildings';
 import { BuildingType } from '@/lib/types';
 
@@ -32,9 +32,10 @@ export async function POST(req: NextRequest) {
   }
 
   const def = BUILDING_DEFS[building_type as BuildingType];
-  const buildCost = def.cost(1); // Level 1 cost
+  const buildCost = def.cost(1);
 
-  const db = getServiceClient();
+  const [db, err] = getDbOrError();
+  if (!db) return err;
 
   // Fetch plot
   const { data: plot, error: plotErr } = await db
@@ -48,12 +49,10 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: false, error: 'Plot not found' }, { status: 404 });
   }
 
-  // Must be empty
   if (plot.building_type !== null) {
     return NextResponse.json({ ok: false, error: 'Plot is not empty' }, { status: 400 });
   }
 
-  // Check cooldown (for replacement scenarios – plot was recently cleared)
   if (plot.last_changed_at) {
     const elapsed = Date.now() - new Date(plot.last_changed_at).getTime();
     if (elapsed < 60_000) {
@@ -65,12 +64,10 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  // Check protected
   if (plot.protected) {
     return NextResponse.json({ ok: false, error: 'Plot is protected' }, { status: 403 });
   }
 
-  // Fetch city state and check affordability
   const { data: state } = await db.from('city_state').select('*').eq('id', 1).single();
   if (!state) {
     return NextResponse.json({ ok: false, error: 'City state not found' }, { status: 500 });
@@ -80,7 +77,6 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: false, error: 'Not enough resources' }, { status: 400 });
   }
 
-  // Deduct resources
   const { error: updateErr } = await db
     .from('city_state')
     .update({
@@ -95,7 +91,6 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: false, error: 'Failed to update resources' }, { status: 500 });
   }
 
-  // Place building
   const now = new Date().toISOString();
   const { error: placeErr } = await db
     .from('plots')
@@ -113,7 +108,6 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: false, error: 'Failed to place building' }, { status: 500 });
   }
 
-  // Log action
   await db.from('actions_log').insert({
     user_id: userId,
     action_type: 'place',

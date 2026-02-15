@@ -4,7 +4,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { getUserId } from '@/lib/auth';
-import { getServiceClient } from '@/lib/supabase/server';
+import { getDbOrError } from '@/lib/supabase/server';
 
 export async function POST(req: NextRequest) {
   const userId = await getUserId(req);
@@ -19,9 +19,9 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: false, error: 'project_id required' }, { status: 400 });
   }
 
-  const db = getServiceClient();
+  const [db, err] = getDbOrError();
+  if (!db) return err;
 
-  // Check project exists and is active
   const { data: project } = await db
     .from('projects')
     .select('*')
@@ -36,7 +36,6 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: false, error: 'Project is not active' }, { status: 400 });
   }
 
-  // Insert vote (unique constraint will prevent duplicates)
   const { error } = await db
     .from('votes')
     .insert({ project_id, user_id: userId });
@@ -48,13 +47,11 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
   }
 
-  // Increment vote count
   await db
     .from('projects')
     .update({ vote_count: project.vote_count + 1 })
     .eq('id', project_id);
 
-  // Log
   await db.from('actions_log').insert({
     user_id: userId,
     action_type: 'vote',

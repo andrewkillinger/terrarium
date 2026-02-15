@@ -4,7 +4,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { getUserId } from '@/lib/auth';
-import { getServiceClient } from '@/lib/supabase/server';
+import { getDbOrError } from '@/lib/supabase/server';
 
 export async function POST(req: NextRequest) {
   const userId = await getUserId(req);
@@ -19,7 +19,8 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: false, error: 'message_id required' }, { status: 400 });
   }
 
-  const db = getServiceClient();
+  const [db, err] = getDbOrError();
+  if (!db) return err;
 
   const { error } = await db
     .from('chat_reports')

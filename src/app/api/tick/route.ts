@@ -5,36 +5,34 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { isCronAuthorized, isAdmin } from '@/lib/auth';
-import { getServiceClient } from '@/lib/supabase/server';
+import { getDbOrError } from '@/lib/supabase/server';
 import { computeTickProduction } from '@/lib/buildings';
+import { SupabaseClient } from '@supabase/supabase-js';
+
+export const dynamic = 'force-static';
 
 export async function POST(req: NextRequest) {
-  // Only cron or admin can trigger
   if (!isCronAuthorized(req) && !isAdmin(req)) {
     return NextResponse.json({ ok: false, error: 'Unauthorized' }, { status: 401 });
   }
 
-  const db = getServiceClient();
+  const [db, err] = getDbOrError();
+  if (!db) return err;
 
-  // Use a raw RPC call for atomic tick processing
-  // We use SELECT ... FOR UPDATE to lock the city_state row
   const { data: result, error } = await db.rpc('process_tick');
 
   if (error) {
-    // If the RPC doesn't exist yet, fall back to JS-based tick
     return await fallbackTick(db);
   }
 
   return NextResponse.json({ ok: true, data: result });
 }
 
-// GET handler for Vercel Cron compatibility
 export async function GET(req: NextRequest) {
   return POST(req);
 }
 
-async function fallbackTick(db: ReturnType<typeof getServiceClient>) {
-  // Fetch all plots with buildings
+async function fallbackTick(db: SupabaseClient) {
   const { data: plots } = await db
     .from('plots')
     .select('x, y, building_type, level')
@@ -46,7 +44,6 @@ async function fallbackTick(db: ReturnType<typeof getServiceClient>) {
 
   const production = computeTickProduction(plots);
 
-  // Fetch current state and update atomically
   const { data: state } = await db
     .from('city_state')
     .select('*')
@@ -70,23 +67,18 @@ async function fallbackTick(db: ReturnType<typeof getServiceClient>) {
       updated_at: new Date().toISOString(),
     })
     .eq('id', 1)
-    .eq('tick_number', state.tick_number); // Optimistic concurrency check
+    .eq('tick_number', state.tick_number);
 
   if (updateErr) {
-    return NextResponse.json({ ok: false, error: 'Tick conflict – another tick is running' }, { status: 409 });
+    return NextResponse.json({ ok: false, error: 'Tick conflict' }, { status: 409 });
   }
 
-  // Log
   await db.from('actions_log').insert({
     user_id: null,
     action_type: 'tick',
-    payload: {
-      tick_number: newTickNumber,
-      production,
-    },
+    payload: { tick_number: newTickNumber, production },
   });
 
-  // Check and complete any active projects that have met their goals
   await checkProjects(db);
 
   return NextResponse.json({
@@ -102,7 +94,7 @@ async function fallbackTick(db: ReturnType<typeof getServiceClient>) {
   });
 }
 
-async function checkProjects(db: ReturnType<typeof getServiceClient>) {
+async function checkProjects(db: SupabaseClient) {
   const { data: active } = await db
     .from('projects')
     .select('*')
@@ -124,7 +116,6 @@ async function checkProjects(db: ReturnType<typeof getServiceClient>) {
       completed = project.vote_count >= project.vote_threshold;
     }
 
-    // Check deadline
     const expired = project.deadline && new Date(project.deadline) < now;
 
     if (completed) {

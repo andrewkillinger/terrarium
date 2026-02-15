@@ -3,10 +3,13 @@
 // ============================================================
 
 import { NextResponse } from 'next/server';
-import { getServiceClient } from '@/lib/supabase/server';
+import { getDbOrError } from '@/lib/supabase/server';
+
+export const dynamic = 'force-static';
 
 export async function GET() {
-  const db = getServiceClient();
+  const [db, err] = getDbOrError();
+  if (!db) return err;
 
   const [plotsRes, stateRes, projectsRes, settingsRes] = await Promise.all([
     db.from('plots').select('*').order('y').order('x'),

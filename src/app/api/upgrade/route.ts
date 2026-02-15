@@ -4,7 +4,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { getUserId } from '@/lib/auth';
-import { getServiceClient } from '@/lib/supabase/server';
+import { getDbOrError } from '@/lib/supabase/server';
 import { BUILDING_DEFS, canAfford } from '@/lib/buildings';
 import { BuildingType } from '@/lib/types';
 
@@ -17,9 +17,9 @@ export async function POST(req: NextRequest) {
   const body = await req.json();
   const { x, y } = body as { x: number; y: number };
 
-  const db = getServiceClient();
+  const [db, err] = getDbOrError();
+  if (!db) return err;
 
-  // Fetch plot
   const { data: plot, error: plotErr } = await db
     .from('plots')
     .select('*')
@@ -47,7 +47,6 @@ export async function POST(req: NextRequest) {
 
   const upgradeCost = def.cost(nextLevel);
 
-  // Fetch city state
   const { data: state } = await db.from('city_state').select('*').eq('id', 1).single();
   if (!state) {
     return NextResponse.json({ ok: false, error: 'City state not found' }, { status: 500 });
@@ -57,7 +56,6 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: false, error: 'Not enough resources' }, { status: 400 });
   }
 
-  // Deduct resources
   await db
     .from('city_state')
     .update({
@@ -68,18 +66,13 @@ export async function POST(req: NextRequest) {
     })
     .eq('id', 1);
 
-  // Upgrade
   const now = new Date().toISOString();
   await db
     .from('plots')
-    .update({
-      level: nextLevel,
-      updated_at: now,
-    })
+    .update({ level: nextLevel, updated_at: now })
     .eq('x', x)
     .eq('y', y);
 
-  // Log
   await db.from('actions_log').insert({
     user_id: userId,
     action_type: 'upgrade',
