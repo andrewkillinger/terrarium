@@ -7,8 +7,15 @@ import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 
 export async function POST() {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-  const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+
+  if (!url || !anonKey) {
+    return NextResponse.json(
+      { ok: false, error: 'Supabase not configured' },
+      { status: 503 }
+    );
+  }
 
   const supabase = createClient(url, anonKey, {
     auth: { persistSession: false },

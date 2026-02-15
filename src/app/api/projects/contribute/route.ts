@@ -4,7 +4,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { getUserId } from '@/lib/auth';
-import { getServiceClient } from '@/lib/supabase/server';
+import { getDbOrError } from '@/lib/supabase/server';
 
 export async function POST(req: NextRequest) {
   const userId = await getUserId(req);
@@ -32,9 +32,9 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: false, error: 'Must contribute at least something' }, { status: 400 });
   }
 
-  const db = getServiceClient();
+  const [db, err] = getDbOrError();
+  if (!db) return err;
 
-  // Check project
   const { data: project } = await db
     .from('projects')
     .select('*')
@@ -45,7 +45,6 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: false, error: 'Project not found or not active' }, { status: 404 });
   }
 
-  // Check city can afford
   const { data: state } = await db.from('city_state').select('*').eq('id', 1).single();
   if (!state) {
     return NextResponse.json({ ok: false, error: 'City state not found' }, { status: 500 });
@@ -55,7 +54,6 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: false, error: 'Not enough resources' }, { status: 400 });
   }
 
-  // Deduct from city
   await db
     .from('city_state')
     .update({
@@ -66,7 +64,6 @@ export async function POST(req: NextRequest) {
     })
     .eq('id', 1);
 
-  // Add to project contributions
   await db.from('project_contributions').insert({
     project_id,
     user_id: userId,
@@ -75,7 +72,6 @@ export async function POST(req: NextRequest) {
     stone: s,
   });
 
-  // Update project totals
   await db
     .from('projects')
     .update({
@@ -85,7 +81,6 @@ export async function POST(req: NextRequest) {
     })
     .eq('id', project_id);
 
-  // Log
   await db.from('actions_log').insert({
     user_id: userId,
     action_type: 'contribute',

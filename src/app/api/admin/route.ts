@@ -4,7 +4,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { isAdmin } from '@/lib/auth';
-import { getServiceClient } from '@/lib/supabase/server';
+import { getDbOrError } from '@/lib/supabase/server';
 
 type AdminAction =
   | 'revert_actions'
@@ -22,7 +22,9 @@ export async function POST(req: NextRequest) {
 
   const body = await req.json();
   const action = body.action as AdminAction;
-  const db = getServiceClient();
+
+  const [db, err] = getDbOrError();
+  if (!db) return err;
 
   switch (action) {
     case 'revert_actions': {

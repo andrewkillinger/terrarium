@@ -20,6 +20,11 @@ export function getAccessToken(): string | null {
   return accessToken;
 }
 
+// API base URL: when deployed on GitHub Pages (static export),
+// API calls go to the Vercel-hosted backend.
+// Set NEXT_PUBLIC_API_URL to point to the Vercel deployment.
+const API_BASE = process.env.NEXT_PUBLIC_API_URL || '';
+
 async function apiFetch<T>(path: string, options?: RequestInit): Promise<ApiResponse<T>> {
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
@@ -30,7 +35,8 @@ async function apiFetch<T>(path: string, options?: RequestInit): Promise<ApiResp
     headers['Authorization'] = `Bearer ${accessToken}`;
   }
 
-  const res = await fetch(path, { ...options, headers });
+  const url = `${API_BASE}${path}`;
+  const res = await fetch(url, { ...options, headers });
   return res.json();
 }
 

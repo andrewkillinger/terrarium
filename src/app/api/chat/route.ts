@@ -6,13 +6,17 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { getUserId } from '@/lib/auth';
-import { getServiceClient } from '@/lib/supabase/server';
+import { getDbOrError } from '@/lib/supabase/server';
 import { CHAT_MAX_LENGTH, CHAT_RATE_LIMIT_SECONDS } from '@/lib/buildings';
 
+export const dynamic = 'force-static';
+
 export async function GET(req: NextRequest) {
-  const db = getServiceClient();
+  const [db, err] = getDbOrError();
+  if (!db) return err;
+
   const url = new URL(req.url);
-  const before = url.searchParams.get('before'); // cursor for pagination
+  const before = url.searchParams.get('before');
   const limit = Math.min(parseInt(url.searchParams.get('limit') || '100'), 100);
 
   let query = db
@@ -54,9 +58,9 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  const db = getServiceClient();
+  const [db, err] = getDbOrError();
+  if (!db) return err;
 
-  // Check slow mode setting
   const { data: slowMode } = await db
     .from('app_settings')
     .select('value')
@@ -67,7 +71,6 @@ export async function POST(req: NextRequest) {
   const slowModeEnabled = slowMode?.value?.enabled ?? false;
   const rateLimit = slowModeEnabled ? Number(interval) : CHAT_RATE_LIMIT_SECONDS;
 
-  // Rate limit: check last message by this user
   const { data: lastMsg } = await db
     .from('chat_messages')
     .select('created_at')
@@ -87,7 +90,6 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  // Insert message
   const { data: msg, error } = await db
     .from('chat_messages')
     .insert({ user_id: userId, content })
