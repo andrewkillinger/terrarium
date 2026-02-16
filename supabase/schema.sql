@@ -1,4 +1,5 @@
 -- Shared City Builder - Supabase Schema
+-- Safe to re-run: all statements are idempotent (IF NOT EXISTS / DROP IF EXISTS).
 -- Run this in the Supabase SQL editor to set up all tables, indexes, and RLS.
 
 -- Enable required extensions
@@ -20,9 +21,9 @@ CREATE TABLE IF NOT EXISTS plots (
   UNIQUE (x, y)
 );
 
-CREATE INDEX idx_plots_coords ON plots (x, y);
-CREATE INDEX idx_plots_building_type ON plots (building_type) WHERE building_type IS NOT NULL;
-CREATE INDEX idx_plots_placed_by ON plots (placed_by_user_id) WHERE placed_by_user_id IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_plots_coords ON plots (x, y);
+CREATE INDEX IF NOT EXISTS idx_plots_building_type ON plots (building_type) WHERE building_type IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_plots_placed_by ON plots (placed_by_user_id) WHERE placed_by_user_id IS NOT NULL;
 
 ------------------------------------------------------------
 -- 2. CITY_STATE (singleton)
@@ -53,8 +54,8 @@ CREATE TABLE IF NOT EXISTS actions_log (
   created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
-CREATE INDEX idx_actions_log_created ON actions_log (created_at DESC);
-CREATE INDEX idx_actions_log_user ON actions_log (user_id) WHERE user_id IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_actions_log_created ON actions_log (created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_actions_log_user ON actions_log (user_id) WHERE user_id IS NOT NULL;
 
 ------------------------------------------------------------
 -- 4. PROJECTS (community projects)
@@ -79,7 +80,7 @@ CREATE TABLE IF NOT EXISTS projects (
   completed_at TIMESTAMPTZ
 );
 
-CREATE INDEX idx_projects_status ON projects (status);
+CREATE INDEX IF NOT EXISTS idx_projects_status ON projects (status);
 
 ------------------------------------------------------------
 -- 5. VOTES (unique per project/user)
@@ -92,7 +93,7 @@ CREATE TABLE IF NOT EXISTS votes (
   UNIQUE (project_id, user_id)
 );
 
-CREATE INDEX idx_votes_project ON votes (project_id);
+CREATE INDEX IF NOT EXISTS idx_votes_project ON votes (project_id);
 
 ------------------------------------------------------------
 -- 6. PROJECT CONTRIBUTIONS
@@ -107,7 +108,7 @@ CREATE TABLE IF NOT EXISTS project_contributions (
   created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
-CREATE INDEX idx_contributions_project ON project_contributions (project_id);
+CREATE INDEX IF NOT EXISTS idx_contributions_project ON project_contributions (project_id);
 
 ------------------------------------------------------------
 -- 7. CHAT MESSAGES
@@ -120,8 +121,8 @@ CREATE TABLE IF NOT EXISTS chat_messages (
   created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
-CREATE INDEX idx_chat_created ON chat_messages (created_at DESC);
-CREATE INDEX idx_chat_user ON chat_messages (user_id);
+CREATE INDEX IF NOT EXISTS idx_chat_created ON chat_messages (created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_chat_user ON chat_messages (user_id);
 
 ------------------------------------------------------------
 -- 8. CHAT REPORTS
@@ -171,7 +172,16 @@ ALTER TABLE chat_messages ENABLE ROW LEVEL SECURITY;
 ALTER TABLE chat_reports ENABLE ROW LEVEL SECURITY;
 ALTER TABLE app_settings ENABLE ROW LEVEL SECURITY;
 
--- PUBLIC READ policies
+-- PUBLIC READ policies (drop first to make idempotent)
+DROP POLICY IF EXISTS "public_read_plots" ON plots;
+DROP POLICY IF EXISTS "public_read_city_state" ON city_state;
+DROP POLICY IF EXISTS "public_read_actions_log" ON actions_log;
+DROP POLICY IF EXISTS "public_read_projects" ON projects;
+DROP POLICY IF EXISTS "public_read_votes" ON votes;
+DROP POLICY IF EXISTS "public_read_contributions" ON project_contributions;
+DROP POLICY IF EXISTS "public_read_chat" ON chat_messages;
+DROP POLICY IF EXISTS "public_read_settings" ON app_settings;
+
 CREATE POLICY "public_read_plots" ON plots FOR SELECT USING (true);
 CREATE POLICY "public_read_city_state" ON city_state FOR SELECT USING (true);
 CREATE POLICY "public_read_actions_log" ON actions_log FOR SELECT USING (true);
@@ -185,7 +195,24 @@ CREATE POLICY "public_read_settings" ON app_settings FOR SELECT USING (true);
 -- No INSERT/UPDATE/DELETE policies for anon/authenticated roles means writes are denied.
 
 -- Enable realtime for the tables that need it
-ALTER PUBLICATION supabase_realtime ADD TABLE plots;
-ALTER PUBLICATION supabase_realtime ADD TABLE city_state;
-ALTER PUBLICATION supabase_realtime ADD TABLE chat_messages;
-ALTER PUBLICATION supabase_realtime ADD TABLE actions_log;
+-- (safe to re-run: Supabase ignores duplicates in publication)
+DO $$
+BEGIN
+  ALTER PUBLICATION supabase_realtime ADD TABLE plots;
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
+DO $$
+BEGIN
+  ALTER PUBLICATION supabase_realtime ADD TABLE city_state;
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
+DO $$
+BEGIN
+  ALTER PUBLICATION supabase_realtime ADD TABLE chat_messages;
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
+DO $$
+BEGIN
+  ALTER PUBLICATION supabase_realtime ADD TABLE actions_log;
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
