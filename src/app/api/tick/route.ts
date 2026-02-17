@@ -9,7 +9,7 @@ import { getDbOrError } from '@/lib/supabase/server';
 import { computeTickProduction } from '@/lib/buildings';
 import { SupabaseClient } from '@supabase/supabase-js';
 
-export const dynamic = 'force-static';
+export const dynamic = 'force-dynamic';
 
 export async function POST(req: NextRequest) {
   if (!isCronAuthorized(req) && !isAdmin(req)) {

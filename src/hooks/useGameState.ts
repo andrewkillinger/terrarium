@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { Plot, CityState, Project, ChatMessage, ActionLog, BuildingType } from '@/lib/types';
+import { Plot, CityState, Project, ChatMessage, ActionLog, BuildingType, GameEvent, Milestone, Era, TickNotificationData } from '@/lib/types';
 import { TICK_INTERVAL_MINUTES } from '@/lib/buildings';
 import {
   loadGame,
@@ -13,6 +13,7 @@ import {
   contributeToProject,
   shouldTick,
   getTickCountdown,
+  checkMilestones,
   LocalGameData,
   ActionResult,
 } from '@/lib/local-engine';
@@ -27,6 +28,15 @@ export interface GameState {
   loading: boolean;
   error: string | null;
   tickCountdown: number;
+  // New game systems
+  era: Era;
+  milestones: Milestone[];
+  activeEvents: GameEvent[];
+  tickNotification: TickNotificationData | null;
+  latestMilestone: Milestone | null;
+  lastPlacedPlot?: { x: number; y: number; tick: number };
+  lastUpgradedPlot?: { x: number; y: number; tick: number };
+  showMiniMap: boolean;
 }
 
 export interface GameActions {
@@ -37,6 +47,7 @@ export interface GameActions {
   contributeProject: (projectId: string, coins: number, wood: number, stone: number) => ActionResult;
   refreshState: () => void;
   refreshProjects: () => void;
+  toggleMiniMap: () => void;
 }
 
 export function useGameState(): GameState & GameActions {
@@ -44,16 +55,25 @@ export function useGameState(): GameState & GameActions {
   const [version, setVersion] = useState(0);
   const [loading, setLoading] = useState(true);
   const [tickCountdown, setTickCountdown] = useState(TICK_INTERVAL_MINUTES * 60);
+  const [tickNotification, setTickNotification] = useState<TickNotificationData | null>(null);
+  const [latestMilestone, setLatestMilestone] = useState<Milestone | null>(null);
+  const [showMiniMap, setShowMiniMap] = useState(true);
 
-  // Force re-render after mutations
   const bump = useCallback(() => setVersion((v) => v + 1), []);
 
-  // Initialize game on mount
+  // Check for new milestones and show toast
+  const checkAndShowMilestones = useCallback((data: LocalGameData) => {
+    const newMilestones = checkMilestones(data);
+    if (newMilestones.length > 0) {
+      // Show the first new milestone (queue if multiple)
+      setLatestMilestone(newMilestones[0]);
+    }
+  }, []);
+
   useEffect(() => {
     const data = loadGame();
     gameDataRef.current = data;
 
-    // Process any missed ticks (e.g. user was away)
     while (shouldTick(data)) {
       processTick(data);
     }
@@ -62,7 +82,7 @@ export function useGameState(): GameState & GameActions {
     bump();
   }, [bump]);
 
-  // Tick timer: countdown + auto-process
+  // Tick timer
   useEffect(() => {
     if (!gameDataRef.current) return;
 
@@ -70,7 +90,18 @@ export function useGameState(): GameState & GameActions {
       const data = gameDataRef.current!;
 
       if (shouldTick(data)) {
-        processTick(data);
+        const result = processTick(data);
+
+        // Show tick notification
+        setTickNotification({
+          coins: result.production.coins,
+          wood: result.production.wood,
+          stone: result.production.stone,
+          population: result.production.populationDelta,
+          event: result.event,
+        });
+
+        checkAndShowMilestones(data);
         bump();
       }
 
@@ -78,7 +109,7 @@ export function useGameState(): GameState & GameActions {
     }, 1000);
 
     return () => clearInterval(interval);
-  }, [bump]);
+  }, [bump, checkAndShowMilestones]);
 
   const data = gameDataRef.current;
 
@@ -86,20 +117,26 @@ export function useGameState(): GameState & GameActions {
     (x: number, y: number, type: BuildingType): ActionResult => {
       if (!gameDataRef.current) return { ok: false, error: 'Not loaded' };
       const result = placeBuilding(gameDataRef.current, x, y, type);
-      if (result.ok) bump();
+      if (result.ok) {
+        checkAndShowMilestones(gameDataRef.current);
+        bump();
+      }
       return result;
     },
-    [bump]
+    [bump, checkAndShowMilestones]
   );
 
   const doUpgrade = useCallback(
     (x: number, y: number): ActionResult => {
       if (!gameDataRef.current) return { ok: false, error: 'Not loaded' };
       const result = upgradeBuilding(gameDataRef.current, x, y);
-      if (result.ok) bump();
+      if (result.ok) {
+        checkAndShowMilestones(gameDataRef.current);
+        bump();
+      }
       return result;
     },
-    [bump]
+    [bump, checkAndShowMilestones]
   );
 
   const doSendChat = useCallback(
@@ -134,8 +171,8 @@ export function useGameState(): GameState & GameActions {
 
   const refreshState = useCallback(() => bump(), [bump]);
   const refreshProjects = useCallback(() => bump(), [bump]);
+  const toggleMiniMap = useCallback(() => setShowMiniMap(v => !v), []);
 
-  // version drives re-renders via state
   void version;
 
   return {
@@ -148,6 +185,14 @@ export function useGameState(): GameState & GameActions {
     loading,
     error: null,
     tickCountdown,
+    era: data?.era ?? 'village',
+    milestones: data?.milestones ?? [],
+    activeEvents: data?.activeEvents ?? [],
+    tickNotification,
+    latestMilestone,
+    lastPlacedPlot: data?.lastPlacedPlot,
+    lastUpgradedPlot: data?.lastUpgradedPlot,
+    showMiniMap,
     placeBuilding: doPlace,
     upgradeBuilding: doUpgrade,
     sendChat: doSendChat,
@@ -155,5 +200,6 @@ export function useGameState(): GameState & GameActions {
     contributeProject: doContributeProject,
     refreshState,
     refreshProjects,
+    toggleMiniMap,
   };
 }

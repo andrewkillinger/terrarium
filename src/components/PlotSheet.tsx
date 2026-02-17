@@ -2,7 +2,8 @@
 
 import { useState } from 'react';
 import { Plot, BuildingType, CityState } from '@/lib/types';
-import { BUILDING_DEFS, BUILDING_TYPES, canAfford } from '@/lib/buildings';
+import { BUILDING_DEFS, canAfford, getAvailableBuildings, getPlotDistrict } from '@/lib/buildings';
+import { DISTRICT_RULES } from '@/lib/game-config';
 import { ActionResult } from '@/lib/local-engine';
 
 interface PlotSheetProps {
@@ -12,15 +13,24 @@ interface PlotSheetProps {
   onPlace: (x: number, y: number, type: BuildingType) => ActionResult;
   onUpgrade: (x: number, y: number) => ActionResult;
   onAction: () => void;
+  population: number;
+  userId: string | null;
+  plots: Plot[];
 }
 
-export default function PlotSheet({ plot, cityState, onClose, onPlace, onUpgrade, onAction }: PlotSheetProps) {
+export default function PlotSheet({ plot, cityState, onClose, onPlace, onUpgrade, onAction, population, userId, plots }: PlotSheetProps) {
   const [error, setError] = useState<string | null>(null);
 
   if (!plot) return null;
 
   const building = plot.building_type as BuildingType | null;
   const def = building ? BUILDING_DEFS[building] : null;
+  const availableBuildings = getAvailableBuildings(population);
+  const isOwned = plot.placed_by_user_id === userId;
+
+  // Check if plot is in a district
+  const district = building ? getPlotDistrict(plot.x, plot.y, plots) : null;
+  const districtRule = district ? DISTRICT_RULES.find(r => r.type === district.type) : null;
 
   const handlePlace = (type: BuildingType) => {
     setError(null);
@@ -53,9 +63,9 @@ export default function PlotSheet({ plot, cityState, onClose, onPlace, onUpgrade
 
   return (
     <div className="fixed inset-x-0 bottom-0 z-50 animate-slide-up">
-      <div className="fixed inset-0 bg-black/30" onClick={onClose} />
+      <div className="fixed inset-0 bg-black/40 backdrop-blur-sm" onClick={onClose} />
 
-      <div className="relative bg-gray-900 text-white rounded-t-2xl max-h-[70vh] overflow-y-auto pb-safe">
+      <div className="relative bg-gradient-to-b from-gray-900 to-gray-950 text-white rounded-t-2xl max-h-[70vh] overflow-y-auto pb-safe border-t border-gray-700/50">
         <div className="flex justify-center pt-3 pb-2">
           <div className="w-10 h-1 bg-gray-600 rounded-full" />
         </div>
@@ -66,31 +76,40 @@ export default function PlotSheet({ plot, cityState, onClose, onPlace, onUpgrade
               Plot ({plot.x}, {plot.y})
               {building && (
                 <span className="ml-2">
-                  {def?.emoji} {def?.label} Lv.{plot.level}
+                  {def?.emoji} {def?.label} <span className={`level-${Math.min(plot.level, 5)}`} style={{ fontSize: '0.9em' }}>Lv.{plot.level}</span>
                 </span>
               )}
             </h2>
-            <button onClick={onClose} className="text-gray-400 text-2xl leading-none">
+            <button onClick={onClose} className="text-gray-400 text-2xl leading-none hover:text-white transition-colors">
               &times;
             </button>
           </div>
 
           {plot.protected && (
-            <div className="text-yellow-400 text-sm mb-2">This plot is protected</div>
+            <div className="text-yellow-400 text-sm mb-2 flex items-center gap-1">
+              <span>🔒</span> This plot is protected
+            </div>
           )}
 
-          {error && <div className="text-red-400 text-sm mb-2">{error}</div>}
+          {district && districtRule && (
+            <div className="bg-blue-900/30 border border-blue-500/30 rounded-lg px-3 py-2 mb-3 text-sm">
+              <span className="font-medium text-blue-300">{districtRule.icon} {districtRule.label}</span>
+              <span className="text-blue-400/70 ml-2">{districtRule.description}</span>
+            </div>
+          )}
+
+          {error && <div className="text-red-400 text-sm mb-2 bg-red-900/20 border border-red-500/30 rounded-lg px-3 py-2">{error}</div>}
 
           {!building && (
             <div>
-              <h3 className="text-sm text-gray-400 mb-2">Build:</h3>
+              <h3 className="text-sm text-gray-400 mb-2 font-medium">Build:</h3>
               {onCooldown && (
-                <div className="text-yellow-400 text-sm mb-2">
-                  Cooldown: {Math.ceil(cooldownRemaining)}s remaining
+                <div className="text-yellow-400 text-sm mb-2 flex items-center gap-1">
+                  <span>⏳</span> Cooldown: {Math.ceil(cooldownRemaining)}s remaining
                 </div>
               )}
               <div className="grid grid-cols-2 gap-2">
-                {BUILDING_TYPES.map((type) => {
+                {availableBuildings.map((type) => {
                   const d = BUILDING_DEFS[type];
                   const c = d.cost(1);
                   const affordable = cityState ? canAfford(cityState, c) : false;
@@ -100,20 +119,36 @@ export default function PlotSheet({ plot, cityState, onClose, onPlace, onUpgrade
                       key={type}
                       disabled={onCooldown || plot.protected || !affordable}
                       onClick={() => handlePlace(type)}
-                      className="bg-gray-800 rounded-lg p-3 text-left hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                      className="bg-gray-800/80 rounded-xl p-3 text-left hover:bg-gray-700/80 disabled:opacity-40 disabled:cursor-not-allowed transition-all hover:scale-[1.02] active:scale-[0.98] border border-gray-700/50"
                     >
                       <div className="text-lg mb-1">
-                        {d.emoji} {d.label}
+                        {d.emoji} <span className="text-sm font-medium">{d.label}</span>
                       </div>
-                      <div className="text-xs text-gray-400">{d.description}</div>
-                      <div className="text-xs mt-1 flex gap-2">
-                        {c.coins > 0 && <span className="text-yellow-400">{c.coins}c</span>}
-                        {c.wood > 0 && <span className="text-green-400">{c.wood}w</span>}
-                        {c.stone > 0 && <span className="text-gray-300">{c.stone}s</span>}
+                      <div className="text-xs text-gray-400 leading-tight">{d.description}</div>
+                      <div className="text-xs mt-1.5 flex gap-2">
+                        {c.coins > 0 && <span className="text-yellow-400 font-mono">{c.coins}c</span>}
+                        {c.wood > 0 && <span className="text-green-400 font-mono">{c.wood}w</span>}
+                        {c.stone > 0 && <span className="text-gray-300 font-mono">{c.stone}s</span>}
                       </div>
+                      {d.unlockPopulation && (
+                        <div className="text-[10px] text-purple-400 mt-1">Unlocked at {d.unlockPopulation} pop</div>
+                      )}
                     </button>
                   );
                 })}
+
+                {/* Show locked buildings */}
+                {Object.values(BUILDING_DEFS).filter(d => d.unlockPopulation && population < d.unlockPopulation).map(d => (
+                  <div
+                    key={d.type}
+                    className="bg-gray-800/30 rounded-xl p-3 text-left opacity-40 border border-gray-700/30"
+                  >
+                    <div className="text-lg mb-1">
+                      🔒 <span className="text-sm font-medium">{d.label}</span>
+                    </div>
+                    <div className="text-xs text-gray-500">Requires {d.unlockPopulation} population</div>
+                  </div>
+                ))}
               </div>
             </div>
           )}
@@ -122,20 +157,20 @@ export default function PlotSheet({ plot, cityState, onClose, onPlace, onUpgrade
             <div>
               <div className="text-sm text-gray-400 mb-3">{def.description}</div>
 
-              <div className="bg-gray-800 rounded-lg p-3 mb-3">
-                <h3 className="text-sm font-medium mb-1">Per Tick Production</h3>
+              <div className="bg-gray-800/60 rounded-xl p-3 mb-3 border border-gray-700/30">
+                <h3 className="text-sm font-medium mb-1.5 text-gray-300">Per Tick Production</h3>
                 <div className="flex gap-3 text-sm">
                   {def.production(plot.level).coins > 0 && (
-                    <span>+{def.production(plot.level).coins} coins</span>
+                    <span className="text-yellow-300 font-mono">+{def.production(plot.level).coins} 🪙</span>
                   )}
                   {def.production(plot.level).wood > 0 && (
-                    <span>+{def.production(plot.level).wood} wood</span>
+                    <span className="text-green-300 font-mono">+{def.production(plot.level).wood} 🪵</span>
                   )}
                   {def.production(plot.level).stone > 0 && (
-                    <span>+{def.production(plot.level).stone} stone</span>
+                    <span className="text-gray-300 font-mono">+{def.production(plot.level).stone} 🪨</span>
                   )}
                   {def.populationDelta(plot.level) > 0 && (
-                    <span>+{def.populationDelta(plot.level)} pop</span>
+                    <span className="text-blue-300 font-mono">+{def.populationDelta(plot.level)} 👥</span>
                   )}
                 </div>
               </div>
@@ -152,13 +187,13 @@ export default function PlotSheet({ plot, cityState, onClose, onPlace, onUpgrade
                       <button
                         disabled={plot.protected || !affordable}
                         onClick={handleUpgrade}
-                        className="w-full bg-blue-600 rounded-lg p-3 text-center hover:bg-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                        className="w-full bg-gradient-to-r from-blue-600 to-blue-500 rounded-xl p-3 text-center hover:from-blue-500 hover:to-blue-400 disabled:opacity-40 disabled:cursor-not-allowed transition-all hover:scale-[1.01] active:scale-[0.99] shadow-lg shadow-blue-500/20"
                       >
-                        <div className="font-medium">Upgrade</div>
+                        <div className="font-bold">Upgrade</div>
                         <div className="text-xs mt-1 flex justify-center gap-2">
-                          {c.coins > 0 && <span className="text-yellow-400">{c.coins}c</span>}
-                          {c.wood > 0 && <span className="text-green-400">{c.wood}w</span>}
-                          {c.stone > 0 && <span className="text-gray-300">{c.stone}s</span>}
+                          {c.coins > 0 && <span className="text-yellow-300 font-mono">{c.coins}c</span>}
+                          {c.wood > 0 && <span className="text-green-300 font-mono">{c.wood}w</span>}
+                          {c.stone > 0 && <span className="text-gray-200 font-mono">{c.stone}s</span>}
                         </div>
                       </button>
                     );
@@ -167,11 +202,13 @@ export default function PlotSheet({ plot, cityState, onClose, onPlace, onUpgrade
               )}
 
               {isMaxLevel && (
-                <div className="text-green-400 text-sm text-center">Max level reached!</div>
+                <div className="text-center py-2">
+                  <span className="text-yellow-400 font-bold text-shadow-glow">⭐ Max Level!</span>
+                </div>
               )}
 
-              <div className="mt-3 text-xs text-gray-500">
-                <div>Placed by: {plot.placed_by_user_id?.slice(0, 8) || 'You'}...</div>
+              <div className="mt-3 text-xs text-gray-500 space-y-0.5">
+                <div>Placed by: {isOwned ? 'You' : `${plot.placed_by_user_id?.slice(0, 8) || 'Unknown'}...`}</div>
                 <div>Last updated: {new Date(plot.updated_at).toLocaleString()}</div>
               </div>
             </div>

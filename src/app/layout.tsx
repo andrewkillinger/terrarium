@@ -2,8 +2,8 @@ import type { Metadata, Viewport } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Shared City Builder",
-  description: "A persistent multiplayer city builder. Everyone builds the same city!",
+  title: "Terrarium – Shared City Builder",
+  description: "Build, grow, and evolve a shared city. Place buildings, form districts, unlock eras, and achieve milestones!",
 };
 
 export const viewport: Viewport = {
@@ -11,7 +11,7 @@ export const viewport: Viewport = {
   initialScale: 1,
   maximumScale: 1,
   userScalable: false,
-  themeColor: "#0a0a0a",
+  themeColor: "#0f172a",
 };
 
 export default function RootLayout({

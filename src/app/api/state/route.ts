@@ -5,7 +5,7 @@
 import { NextResponse } from 'next/server';
 import { getDbOrError } from '@/lib/supabase/server';
 
-export const dynamic = 'force-static';
+export const dynamic = 'force-dynamic';
 
 export async function GET() {
   const [db, err] = getDbOrError();
