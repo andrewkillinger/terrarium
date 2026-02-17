@@ -5,7 +5,9 @@
 import { NextResponse } from 'next/server';
 import { getDbOrError } from '@/lib/supabase/server';
 
-export const dynamic = 'force-dynamic';
+// force-static for GitHub Pages static export compatibility.
+// Change to 'force-dynamic' for Vercel/server deployments with Supabase.
+export const dynamic = 'force-static';
 
 export async function GET() {
   const [db, err] = getDbOrError();

@@ -9,7 +9,9 @@ import { getDbOrError } from '@/lib/supabase/server';
 import { computeTickProduction } from '@/lib/buildings';
 import { SupabaseClient } from '@supabase/supabase-js';
 
-export const dynamic = 'force-dynamic';
+// force-static for GitHub Pages static export compatibility.
+// Change to 'force-dynamic' for Vercel/server deployments with Supabase.
+export const dynamic = 'force-static';
 
 export async function POST(req: NextRequest) {
   if (!isCronAuthorized(req) && !isAdmin(req)) {
