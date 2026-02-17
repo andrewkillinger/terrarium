@@ -9,7 +9,7 @@ import { getUserId } from '@/lib/auth';
 import { getDbOrError } from '@/lib/supabase/server';
 import { CHAT_MAX_LENGTH, CHAT_RATE_LIMIT_SECONDS } from '@/lib/buildings';
 
-export const dynamic = 'force-static';
+export const dynamic = 'force-dynamic';
 
 export async function GET(req: NextRequest) {
   const [db, err] = getDbOrError();

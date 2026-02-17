@@ -2,7 +2,7 @@
 // Local Game Engine – runs entirely in the browser with localStorage
 // ============================================================
 
-import { Plot, CityState, Project, ChatMessage, ActionLog, BuildingType } from './types';
+import { Plot, CityState, Project, ChatMessage, ActionLog, BuildingType, GameEvent, Milestone, MilestoneCheckState, Era } from './types';
 import {
   BUILDING_DEFS,
   GRID_SIZE,
@@ -12,6 +12,7 @@ import {
   TICK_INTERVAL_MINUTES,
   CHAT_MAX_LENGTH,
 } from './buildings';
+import { rollForEvent, createMilestones, getCurrentEra } from './game-config';
 import { v4 as uuidv4 } from 'uuid';
 
 const STORAGE_KEY = 'city_builder_state';
@@ -24,6 +25,12 @@ export interface LocalGameData {
   actionsLog: ActionLog[];
   userId: string;
   lastTickTime: number;
+  // New game systems
+  milestones: Milestone[];
+  activeEvents: GameEvent[];
+  era: Era;
+  lastPlacedPlot?: { x: number; y: number; tick: number };
+  lastUpgradedPlot?: { x: number; y: number; tick: number };
 }
 
 function generateUserId(): string {
@@ -111,16 +118,17 @@ function createSeedProjects(): Project[] {
 }
 
 export function loadGame(): LocalGameData {
-  if (typeof window === 'undefined') {
-    return createFreshGame();
-  }
+  if (typeof window === 'undefined') return createFreshGame();
 
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (raw) {
       const data = JSON.parse(raw) as LocalGameData;
-      // Validate basic structure
       if (data.plots && data.cityState && data.userId) {
+        // Migrate: add new fields if missing
+        if (!data.milestones) data.milestones = createMilestones();
+        if (!data.activeEvents) data.activeEvents = [];
+        if (!data.era) data.era = getCurrentEra(data.cityState.population);
         return data;
       }
     }
@@ -140,6 +148,9 @@ function createFreshGame(): LocalGameData {
     actionsLog: [],
     userId: generateUserId(),
     lastTickTime: Date.now(),
+    milestones: createMilestones(),
+    activeEvents: [],
+    era: 'village',
   };
   saveGame(data);
   return data;
@@ -148,10 +159,82 @@ function createFreshGame(): LocalGameData {
 export function saveGame(data: LocalGameData): void {
   if (typeof window === 'undefined') return;
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+    // Strip non-serializable milestone check functions before saving
+    const toSave = {
+      ...data,
+      milestones: data.milestones.map(m => ({
+        id: m.id,
+        title: m.title,
+        description: m.description,
+        icon: m.icon,
+        achieved: m.achieved,
+        achievedAt: m.achievedAt,
+      })),
+    };
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(toSave));
   } catch {
-    // Storage full — silently fail
+    // Storage full
   }
+}
+
+// Restore milestone check functions from config
+function hydrateMilestones(saved: Partial<Milestone>[]): Milestone[] {
+  const templates = createMilestones();
+  return templates.map(template => {
+    const existing = saved.find(m => m.id === template.id);
+    if (existing) {
+      return { ...template, achieved: existing.achieved || false, achievedAt: existing.achievedAt };
+    }
+    return template;
+  });
+}
+
+// ---- Milestone checking ----
+
+function getMilestoneCheckState(data: LocalGameData): MilestoneCheckState {
+  const buildingCounts: Record<string, number> = {};
+  let totalBuildings = 0;
+  let maxLevel = 0;
+
+  for (const p of data.plots) {
+    if (p.building_type && p.level > 0) {
+      buildingCounts[p.building_type] = (buildingCounts[p.building_type] || 0) + 1;
+      totalBuildings++;
+      if (p.level > maxLevel) maxLevel = p.level;
+    }
+  }
+
+  const projectsCompleted = data.projects.filter(p => p.status === 'completed').length;
+
+  return {
+    population: data.cityState.population,
+    totalBuildings,
+    buildingCounts,
+    maxLevel,
+    tickNumber: data.cityState.tick_number,
+    projectsCompleted,
+  };
+}
+
+export function checkMilestones(data: LocalGameData): Milestone[] {
+  // Ensure milestones have check functions
+  if (!data.milestones[0]?.check) {
+    data.milestones = hydrateMilestones(data.milestones);
+  }
+
+  const state = getMilestoneCheckState(data);
+  const newlyAchieved: Milestone[] = [];
+
+  for (const milestone of data.milestones) {
+    if (milestone.achieved) continue;
+    if (milestone.check && milestone.check(state)) {
+      milestone.achieved = true;
+      milestone.achievedAt = new Date().toISOString();
+      newlyAchieved.push(milestone);
+    }
+  }
+
+  return newlyAchieved;
 }
 
 // ---- Game Actions ----
@@ -172,27 +255,28 @@ export function placeBuilding(
   if (plot.building_type !== null) return { ok: false, error: 'Plot is not empty' };
   if (plot.protected) return { ok: false, error: 'Plot is protected' };
 
-  // Check cooldown
   const elapsed = Date.now() - new Date(plot.last_changed_at).getTime();
   if (elapsed < PLOT_COOLDOWN_SECONDS * 1000) {
     const remaining = Math.ceil((PLOT_COOLDOWN_SECONDS * 1000 - elapsed) / 1000);
     return { ok: false, error: `Cooldown: ${remaining}s remaining` };
   }
 
+  // Check unlock requirement
   const def = BUILDING_DEFS[buildingType];
-  const cost = def.cost(1);
+  if (def.unlockPopulation && data.cityState.population < def.unlockPopulation) {
+    return { ok: false, error: `Requires ${def.unlockPopulation} population to unlock` };
+  }
 
-  if (!canAfford(data.cityState, cost)) {
+  const buildCost = def.cost(1);
+  if (!canAfford(data.cityState, buildCost)) {
     return { ok: false, error: 'Not enough resources' };
   }
 
-  // Deduct resources
-  data.cityState.coins -= cost.coins;
-  data.cityState.wood -= cost.wood;
-  data.cityState.stone -= cost.stone;
+  data.cityState.coins -= buildCost.coins;
+  data.cityState.wood -= buildCost.wood;
+  data.cityState.stone -= buildCost.stone;
   data.cityState.updated_at = new Date().toISOString();
 
-  // Place building
   const now = new Date().toISOString();
   plot.building_type = buildingType;
   plot.level = 1;
@@ -200,7 +284,8 @@ export function placeBuilding(
   plot.updated_at = now;
   plot.last_changed_at = now;
 
-  // Log action
+  data.lastPlacedPlot = { x, y, tick: data.cityState.tick_number };
+
   data.actionsLog.unshift({
     id: uuidv4(),
     user_id: data.userId,
@@ -209,6 +294,14 @@ export function placeBuilding(
     created_at: now,
   });
   data.actionsLog = data.actionsLog.slice(0, 50);
+
+  // Check milestones after placement
+  checkMilestones(data);
+
+  // Update era
+  const production = computeTickProduction(data.plots);
+  data.cityState.population = production.populationDelta;
+  data.era = getCurrentEra(data.cityState.population);
 
   saveGame(data);
   return { ok: true };
@@ -228,19 +321,21 @@ export function upgradeBuilding(
   const nextLevel = plot.level + 1;
   if (nextLevel > def.maxLevel) return { ok: false, error: 'Already at max level' };
 
-  const cost = def.cost(nextLevel);
-  if (!canAfford(data.cityState, cost)) {
+  const upgradeCost = def.cost(nextLevel);
+  if (!canAfford(data.cityState, upgradeCost)) {
     return { ok: false, error: 'Not enough resources' };
   }
 
-  data.cityState.coins -= cost.coins;
-  data.cityState.wood -= cost.wood;
-  data.cityState.stone -= cost.stone;
+  data.cityState.coins -= upgradeCost.coins;
+  data.cityState.wood -= upgradeCost.wood;
+  data.cityState.stone -= upgradeCost.stone;
   data.cityState.updated_at = new Date().toISOString();
 
   const now = new Date().toISOString();
   plot.level = nextLevel;
   plot.updated_at = now;
+
+  data.lastUpgradedPlot = { x, y, tick: data.cityState.tick_number };
 
   data.actionsLog.unshift({
     id: uuidv4(),
@@ -251,34 +346,86 @@ export function upgradeBuilding(
   });
   data.actionsLog = data.actionsLog.slice(0, 50);
 
+  checkMilestones(data);
+
+  const production = computeTickProduction(data.plots);
+  data.cityState.population = production.populationDelta;
+  data.era = getCurrentEra(data.cityState.population);
+
   saveGame(data);
   return { ok: true };
 }
 
-export function processTick(data: LocalGameData): void {
+export function processTick(data: LocalGameData): { production: { coins: number; wood: number; stone: number; populationDelta: number }; event?: GameEvent } {
   const production = computeTickProduction(data.plots);
 
-  data.cityState.coins += production.coins;
-  data.cityState.wood += production.wood;
-  data.cityState.stone += production.stone;
+  let coins = production.coins;
+  let wood = production.wood;
+  let stone = production.stone;
+
+  // Roll for event
+  const eventTemplate = rollForEvent(data.cityState.tick_number + 1);
+  let event: GameEvent | undefined;
+
+  if (eventTemplate) {
+    event = {
+      id: uuidv4(),
+      type: eventTemplate.type,
+      title: eventTemplate.title,
+      description: eventTemplate.description,
+      effect: eventTemplate.effect,
+      startTick: data.cityState.tick_number + 1,
+      duration: eventTemplate.duration,
+      active: true,
+    };
+    data.activeEvents.push(event);
+
+    // Apply event effects
+    if (eventTemplate.effect.coinMultiplier) coins = Math.floor(coins * eventTemplate.effect.coinMultiplier);
+    if (eventTemplate.effect.woodMultiplier) wood = Math.floor(wood * eventTemplate.effect.woodMultiplier);
+    if (eventTemplate.effect.stoneMultiplier) stone = Math.floor(stone * eventTemplate.effect.stoneMultiplier);
+    if (eventTemplate.effect.grantCoins) coins += eventTemplate.effect.grantCoins;
+    if (eventTemplate.effect.grantWood) wood += eventTemplate.effect.grantWood;
+    if (eventTemplate.effect.grantStone) stone += eventTemplate.effect.grantStone;
+  }
+
+  // Apply ongoing events
+  data.activeEvents = data.activeEvents.filter(e => {
+    if (e === event) return true; // Already applied above
+    const ticksSinceStart = (data.cityState.tick_number + 1) - e.startTick;
+    return ticksSinceStart < e.duration;
+  });
+
+  data.cityState.coins += coins;
+  data.cityState.wood += wood;
+  data.cityState.stone += stone;
   data.cityState.population = production.populationDelta;
   data.cityState.tick_number += 1;
   data.cityState.updated_at = new Date().toISOString();
   data.lastTickTime = Date.now();
 
+  // Update era
+  data.era = getCurrentEra(data.cityState.population);
+
   data.actionsLog.unshift({
     id: uuidv4(),
     user_id: null,
     action_type: 'tick',
-    payload: { tick_number: data.cityState.tick_number, production },
+    payload: {
+      tick_number: data.cityState.tick_number,
+      production: { coins, wood, stone },
+      event: event ? { type: event.type, title: event.title } : undefined,
+    },
     created_at: new Date().toISOString(),
   });
   data.actionsLog = data.actionsLog.slice(0, 50);
 
-  // Check project completion
   checkProjects(data);
+  checkMilestones(data);
 
   saveGame(data);
+
+  return { production: { coins, wood, stone, populationDelta: production.populationDelta }, event };
 }
 
 function checkProjects(data: LocalGameData): void {
@@ -307,7 +454,6 @@ export function sendChatMessage(data: LocalGameData, content: string): ActionRes
   if (!trimmed) return { ok: false, error: 'Message cannot be empty' };
   if (trimmed.length > CHAT_MAX_LENGTH) return { ok: false, error: `Max ${CHAT_MAX_LENGTH} chars` };
 
-  // Rate limit
   const lastMsg = data.chatMessages[data.chatMessages.length - 1];
   if (lastMsg && lastMsg.user_id === data.userId) {
     const elapsed = Date.now() - new Date(lastMsg.created_at).getTime();
@@ -324,7 +470,6 @@ export function sendChatMessage(data: LocalGameData, content: string): ActionRes
     deleted: false,
     created_at: new Date().toISOString(),
   });
-  // Keep last 200
   if (data.chatMessages.length > 200) {
     data.chatMessages = data.chatMessages.slice(-200);
   }

@@ -2,7 +2,9 @@
 // Shared City Builder – Core Types
 // ============================================================
 
-export type BuildingType = 'House' | 'LumberMill' | 'Quarry' | 'Market' | 'TownHall' | 'Park';
+export type BuildingType =
+  | 'House' | 'LumberMill' | 'Quarry' | 'Market' | 'TownHall' | 'Park'
+  | 'Factory' | 'Cathedral' | 'Harbor' | 'Road';
 
 export interface BuildingDef {
   type: BuildingType;
@@ -13,6 +15,7 @@ export interface BuildingDef {
   production: (level: number) => ResourceDelta;
   populationDelta: (level: number) => number;
   description: string;
+  unlockPopulation?: number;
 }
 
 export interface ResourceCost {
@@ -120,4 +123,82 @@ export interface ApiResponse<T = unknown> {
   ok: boolean;
   data?: T;
   error?: string;
+}
+
+// ============================================================
+// New Game Systems
+// ============================================================
+
+export type Era = 'village' | 'town' | 'city' | 'metropolis';
+
+export interface EraConfig {
+  name: string;
+  label: string;
+  minPopulation: number;
+  icon: string;
+  colorAccent: string;
+  bgGradient: string;
+}
+
+export interface GameEvent {
+  id: string;
+  type: EventType;
+  title: string;
+  description: string;
+  effect: EventEffect;
+  startTick: number;
+  duration: number;
+  active: boolean;
+}
+
+export type EventType =
+  | 'trade_caravan'
+  | 'forest_fire'
+  | 'gold_rush'
+  | 'storm'
+  | 'festival'
+  | 'discovery';
+
+export interface EventEffect {
+  coinMultiplier?: number;
+  woodMultiplier?: number;
+  stoneMultiplier?: number;
+  grantCoins?: number;
+  grantWood?: number;
+  grantStone?: number;
+}
+
+export interface Milestone {
+  id: string;
+  title: string;
+  description: string;
+  icon: string;
+  check: (state: MilestoneCheckState) => boolean;
+  achieved: boolean;
+  achievedAt?: string;
+}
+
+export interface MilestoneCheckState {
+  population: number;
+  totalBuildings: number;
+  buildingCounts: Record<string, number>;
+  maxLevel: number;
+  tickNumber: number;
+  projectsCompleted: number;
+}
+
+export type DistrictType = 'residential' | 'industrial' | 'commercial' | 'government';
+
+export interface District {
+  type: DistrictType;
+  plots: [number, number][];
+  bonusPercent: number;
+}
+
+export interface TickNotificationData {
+  coins: number;
+  wood: number;
+  stone: number;
+  population: number;
+  event?: GameEvent;
 }
