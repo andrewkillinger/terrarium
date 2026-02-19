@@ -92,7 +92,7 @@ export async function ensureRatingRows(
   const { error } = await supabase
     .from('camp_ratings')
     .upsert(rows as never[], {
-      onConflict: 'child_id_camp_id_unique', // handled by DB constraint name
+      onConflict: 'child_id,camp_id',
       ignoreDuplicates: true,
     })
 
@@ -252,10 +252,12 @@ async function persistVote(vote: PendingVote): Promise<void> {
     return
   }
 
-  // Upsert ratings
-  for (const r of vote.ratings) {
+  // Upsert child-specific ratings (child_id IS NOT NULL)
+  // These work with the partial index camp_ratings_child_camp_uq on (child_id, camp_id)
+  const childRatingUpdates = vote.ratings.filter((r) => r.child_id !== null)
+  if (childRatingUpdates.length > 0) {
     const { error } = await supabase.from('camp_ratings').upsert(
-      {
+      childRatingUpdates.map((r) => ({
         child_id: r.child_id,
         camp_id: r.camp_id,
         elo: r.elo,
@@ -263,11 +265,32 @@ async function persistVote(vote: PendingVote): Promise<void> {
         wins: r.wins,
         losses: r.losses,
         updated_at: new Date().toISOString(),
-      },
+      })),
       { onConflict: 'child_id,camp_id' },
     )
     if (error) {
-      console.warn('Rating upsert warning:', error.message)
+      console.warn('Child rating upsert warning:', error.message)
+    }
+  }
+
+  // Update overall ratings (child_id IS NULL) using UPDATE+filter instead of upsert.
+  // The partial index camp_ratings_overall_camp_uq is on (camp_id) only, so
+  // ON CONFLICT (child_id, camp_id) cannot resolve NULL child_id rows.
+  const overallRatingUpdates = vote.ratings.filter((r) => r.child_id === null)
+  for (const r of overallRatingUpdates) {
+    const { error } = await supabase
+      .from('camp_ratings')
+      .update({
+        elo: r.elo,
+        games: r.games,
+        wins: r.wins,
+        losses: r.losses,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('camp_id', r.camp_id)
+      .is('child_id', null)
+    if (error) {
+      console.warn('Overall rating update warning:', error.message)
     }
   }
 }
