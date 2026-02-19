@@ -31,6 +31,14 @@ export default function TopBar({ children, selectedChild, onSelectChild, pending
             selected={selectedChild}
             onChange={onSelectChild}
           />
+          <button
+            className="icon-btn"
+            onClick={() => navigate('/admin')}
+            aria-label="Admin"
+            title="Admin"
+          >
+            ⚙
+          </button>
         </>
       ) : (
         <>
@@ -53,6 +61,14 @@ export default function TopBar({ children, selectedChild, onSelectChild, pending
               title="Leaderboard"
             >
               🏆
+            </button>
+            <button
+              className="icon-btn"
+              onClick={() => navigate('/admin')}
+              aria-label="Admin"
+              title="Admin"
+            >
+              ⚙
             </button>
           </div>
         </>

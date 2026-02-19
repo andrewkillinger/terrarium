@@ -15,9 +15,11 @@ import {
   recordVote,
   syncOfflineQueue,
   fetchRecentMatchups,
+  archiveAndResetRatings,
 } from '../lib/api'
 import { pickPair } from '../lib/pairing'
 import { getSessionId } from '../lib/session'
+import { supabase } from '../lib/supabase'
 
 interface AppState {
   camps: Camp[]
@@ -35,6 +37,7 @@ interface AppState {
   vote: (winnerCampId: string) => Promise<void>
   retry: () => void
   refreshRatings: () => Promise<void>
+  archiveAndReset: (label: string) => Promise<void>
 }
 
 const AppContext = createContext<AppState | null>(null)
@@ -53,6 +56,9 @@ export function AppProvider({ children: reactChildren }: { children: React.React
   const [selectedCampId, setSelectedCampId] = useState<string | null>(null)
 
   const recentMatchupsRef = useRef<Array<[string, string]>>([])
+  // Ref so the realtime subscription callback always sees the current child
+  // without needing to re-subscribe when the selected child changes.
+  const selectedChildRef = useRef<Child | null>(null)
   const sessionId = getSessionId()
 
   // Online/offline tracking
@@ -72,6 +78,42 @@ export function AppProvider({ children: reactChildren }: { children: React.React
       window.removeEventListener('offline', handleOffline)
     }
   }, [])
+
+  // Supabase Realtime: listen for camp_ratings UPDATE events and push them
+  // directly into state so the leaderboard updates without a page refresh.
+  useEffect(() => {
+    const channel = supabase
+      .channel('camp_ratings_live')
+      .on(
+        'postgres_changes',
+        { event: 'UPDATE', schema: 'public', table: 'camp_ratings' },
+        (payload) => {
+          const updated = payload.new as CampRating
+          if (updated.child_id === null) {
+            // Overall rating changed — always update
+            setOverallRatings((prev) => {
+              const next = new Map(prev)
+              next.set(updated.camp_id, updated)
+              return next
+            })
+          } else if (updated.child_id === selectedChildRef.current?.id) {
+            // Child-specific rating changed for the currently viewed child
+            setChildRatings((prev) => {
+              const next = new Map(prev)
+              next.set(updated.camp_id, updated)
+              return next
+            })
+          }
+        },
+      )
+      .subscribe((status) => {
+        console.log('[realtime] camp_ratings channel status:', status)
+      })
+
+    return () => {
+      supabase.removeChannel(channel)
+    }
+  }, []) // subscribe once on mount; selectedChildRef keeps the callback current
 
   // Initial data load
   const loadAll = useCallback(async () => {
@@ -94,6 +136,7 @@ export function AppProvider({ children: reactChildren }: { children: React.React
 
       const firstChild = childrenData[0] ?? null
       setSelectedChildState(firstChild)
+      selectedChildRef.current = firstChild
 
       // Ensure rating rows exist (idempotent)
       await ensureRatingRows(campsData, childrenData)
@@ -126,6 +169,7 @@ export function AppProvider({ children: reactChildren }: { children: React.React
   const setSelectedChild = useCallback(
     async (child: Child) => {
       setSelectedChildState(child)
+      selectedChildRef.current = child
       setCurrentPair(null)
       try {
         const [childR, recent] = await Promise.all([
@@ -209,6 +253,15 @@ export function AppProvider({ children: reactChildren }: { children: React.React
     loadAll()
   }, [loadAll])
 
+  const archiveAndReset = useCallback(
+    async (label: string) => {
+      await archiveAndResetRatings(label)
+      // Reload everything fresh — ratings back to 1000, votes cleared
+      await loadAll()
+    },
+    [loadAll],
+  )
+
   const value: AppState = {
     camps,
     children,
@@ -225,6 +278,7 @@ export function AppProvider({ children: reactChildren }: { children: React.React
     vote,
     retry,
     refreshRatings,
+    archiveAndReset,
   }
 
   return <AppContext.Provider value={value}>{reactChildren}</AppContext.Provider>
