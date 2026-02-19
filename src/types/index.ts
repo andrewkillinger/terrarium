@@ -70,3 +70,21 @@ export interface RatingUpdate {
   wins: number
   losses: number
 }
+
+export interface ArchivedRating {
+  camp_id: string
+  camp_name: string
+  child_id: string | null
+  child_name: string | null
+  elo: number
+  games: number
+  wins: number
+  losses: number
+}
+
+export interface RatingArchive {
+  id: string
+  label: string
+  archived_at: string
+  ratings: ArchivedRating[]
+}

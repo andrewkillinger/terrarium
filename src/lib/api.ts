@@ -1,7 +1,7 @@
 import { supabase } from './supabase'
 import { computeEloUpdate, ELO_DEFAULT } from './elo'
 import { enqueueVote, getPendingVotes, removeVote } from './offlineQueue'
-import type { Camp, Child, CampRating, RatingUpdate, PendingVote } from '../types'
+import type { Camp, Child, CampRating, RatingUpdate, PendingVote, ArchivedRating, RatingArchive } from '../types'
 
 // ─── Camps ───────────────────────────────────────────────────────────────────
 
@@ -252,6 +252,8 @@ async function persistVote(vote: PendingVote): Promise<void> {
     return
   }
 
+  console.log('[vote] persisted vote', vote.id, 'winner:', vote.winner_camp_id)
+
   // Upsert child-specific ratings (child_id IS NOT NULL)
   // These work with the partial index camp_ratings_child_camp_uq on (child_id, camp_id)
   const childRatingUpdates = vote.ratings.filter((r) => r.child_id !== null)
@@ -270,6 +272,10 @@ async function persistVote(vote: PendingVote): Promise<void> {
     )
     if (error) {
       console.warn('Child rating upsert warning:', error.message)
+    } else {
+      for (const r of childRatingUpdates) {
+        console.log('[vote] child rating updated camp:', r.camp_id, 'elo:', r.elo, 'games:', r.games)
+      }
     }
   }
 
@@ -291,8 +297,67 @@ async function persistVote(vote: PendingVote): Promise<void> {
       .is('child_id', null)
     if (error) {
       console.warn('Overall rating update warning:', error.message)
+    } else {
+      console.log('[vote] overall rating updated camp:', r.camp_id, 'elo:', r.elo, 'games:', r.games)
     }
   }
+}
+
+// ─── Archives & Reset ─────────────────────────────────────────────────────────
+
+/**
+ * Snapshot current ratings into rating_archives, then reset all ratings and
+ * delete all votes for a clean slate.
+ */
+export async function archiveAndResetRatings(label: string): Promise<void> {
+  // 1. Fetch all ratings joined with camp and child names
+  const { data: ratings, error: rErr } = await supabase
+    .from('camp_ratings')
+    .select('*, camps(name), children(name)')
+  if (rErr) throw rErr
+
+  // 2. Shape for JSONB archive storage
+  const snapshot: ArchivedRating[] = ((ratings ?? []) as any[]).map((r) => ({
+    camp_id: r.camp_id,
+    camp_name: r.camps?.name ?? '',
+    child_id: r.child_id,
+    child_name: r.children?.name ?? null,
+    elo: r.elo,
+    games: r.games,
+    wins: r.wins,
+    losses: r.losses,
+  }))
+
+  // 3. Save archive record
+  const { error: archErr } = await supabase
+    .from('rating_archives')
+    .insert({ label, ratings: snapshot })
+  if (archErr) throw archErr
+
+  // 4. Reset all ratings via security-definer RPC
+  const { error: resetErr } = await supabase.rpc('reset_all_ratings')
+  if (resetErr) throw resetErr
+
+  // 5. Delete all votes for a truly clean slate
+  const { error: voteErr } = await supabase
+    .from('votes')
+    .delete()
+    .gte('created_at', '1970-01-01T00:00:00Z')
+  if (voteErr) throw voteErr
+
+  console.log('[admin] archived and reset. label:', label)
+}
+
+/**
+ * Fetch all archived sessions, newest first.
+ */
+export async function fetchArchives(): Promise<RatingArchive[]> {
+  const { data, error } = await supabase
+    .from('rating_archives')
+    .select('*')
+    .order('archived_at', { ascending: false })
+  if (error) throw error
+  return data as RatingArchive[]
 }
 
 /**
