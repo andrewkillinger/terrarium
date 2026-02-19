@@ -1,108 +1,330 @@
-// ============================================================
-// Client-side API helpers
-// ============================================================
+import { supabase } from './supabase'
+import { computeEloUpdate, ELO_DEFAULT } from './elo'
+import { enqueueVote, getPendingVotes, removeVote } from './offlineQueue'
+import type { Camp, Child, CampRating, RatingUpdate, PendingVote } from '../types'
 
-import { ApiResponse } from './types';
+// ─── Camps ───────────────────────────────────────────────────────────────────
 
-let accessToken: string | null = null;
-let userId: string | null = null;
+export async function fetchActiveCamps(): Promise<Camp[]> {
+  const { data, error } = await supabase
+    .from('camps')
+    .select('*')
+    .eq('is_active', true)
+    .order('name')
 
-export function setAuth(token: string, uid: string) {
-  accessToken = token;
-  userId = uid;
+  if (error) throw error
+  return data as Camp[]
 }
 
-export function getUserIdLocal(): string | null {
-  return userId;
+// ─── Children ─────────────────────────────────────────────────────────────────
+
+export async function fetchChildren(): Promise<Child[]> {
+  const { data, error } = await supabase
+    .from('children')
+    .select('*')
+    .order('name')
+
+  if (error) throw error
+  return data as Child[]
 }
 
-export function getAccessToken(): string | null {
-  return accessToken;
-}
+// ─── Ratings ──────────────────────────────────────────────────────────────────
 
-// API base URL: when deployed on GitHub Pages (static export),
-// API calls go to the Vercel-hosted backend.
-// Set NEXT_PUBLIC_API_URL to point to the Vercel deployment.
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || '';
+/**
+ * Fetch all ratings for a given child (null = overall).
+ * Returns a map keyed by camp_id.
+ */
+export async function fetchRatings(
+  childId: string | null,
+): Promise<Map<string, CampRating>> {
+  const query = supabase.from('camp_ratings').select('*')
 
-async function apiFetch<T>(path: string, options?: RequestInit): Promise<ApiResponse<T>> {
-  const headers: Record<string, string> = {
-    'Content-Type': 'application/json',
-    ...(options?.headers as Record<string, string> || {}),
-  };
-
-  if (accessToken) {
-    headers['Authorization'] = `Bearer ${accessToken}`;
+  if (childId === null) {
+    query.is('child_id', null)
+  } else {
+    query.eq('child_id', childId)
   }
 
-  const url = `${API_BASE}${path}`;
-  const res = await fetch(url, { ...options, headers });
-  return res.json();
+  const { data, error } = await query
+  if (error) throw error
+
+  const map = new Map<string, CampRating>()
+  for (const row of data as CampRating[]) {
+    map.set(row.camp_id, row)
+  }
+  return map
 }
 
-export async function initAnonymousAuth(): Promise<{ userId: string; token: string } | null> {
-  // Check localStorage for existing session
-  const stored = typeof window !== 'undefined' ? localStorage.getItem('city_auth') : null;
-  if (stored) {
+/**
+ * Ensure a rating row exists for every (child, camp) combo.
+ * Uses upsert with ignoreDuplicates so it's idempotent.
+ */
+export async function ensureRatingRows(
+  camps: Camp[],
+  children: Child[],
+): Promise<void> {
+  // Build rows: one per (child, camp) + one overall (child_id = null) per camp
+  const rows: Omit<CampRating, 'id' | 'updated_at'>[] = []
+
+  for (const camp of camps) {
+    // Per-child
+    for (const child of children) {
+      rows.push({
+        child_id: child.id,
+        camp_id: camp.id,
+        elo: ELO_DEFAULT,
+        games: 0,
+        wins: 0,
+        losses: 0,
+      })
+    }
+    // Overall (child_id = null)
+    rows.push({
+      child_id: null,
+      camp_id: camp.id,
+      elo: ELO_DEFAULT,
+      games: 0,
+      wins: 0,
+      losses: 0,
+    })
+  }
+
+  const { error } = await supabase
+    .from('camp_ratings')
+    .upsert(rows as never[], {
+      onConflict: 'child_id_camp_id_unique', // handled by DB constraint name
+      ignoreDuplicates: true,
+    })
+
+  if (error) {
+    // Non-fatal: rows may already exist; log but continue
+    console.warn('ensureRatingRows warning:', error.message)
+  }
+}
+
+// ─── Voting ───────────────────────────────────────────────────────────────────
+
+export interface RecordVoteParams {
+  sessionId: string
+  childId: string
+  leftCampId: string
+  rightCampId: string
+  winnerCampId: string
+  childRatings: Map<string, CampRating>
+  overallRatings: Map<string, CampRating>
+}
+
+export interface RecordVoteResult {
+  updatedChildRatings: Map<string, CampRating>
+  updatedOverallRatings: Map<string, CampRating>
+}
+
+/**
+ * Record a vote and update Elo ratings.
+ * - Computes new Elo in the frontend.
+ * - Writes vote row + upserts two rating rows (winner, loser) for each context
+ *   (child + overall).
+ * - If offline, queues the vote locally and syncs on reconnect.
+ */
+export async function recordVote(
+  params: RecordVoteParams,
+): Promise<RecordVoteResult> {
+  const {
+    sessionId,
+    childId,
+    leftCampId,
+    rightCampId,
+    winnerCampId,
+    childRatings,
+    overallRatings,
+  } = params
+
+  const loserCampId =
+    winnerCampId === leftCampId ? rightCampId : leftCampId
+
+  // Compute updated ratings
+  const childWinner = childRatings.get(winnerCampId) ?? makeDefaultRating(childId, winnerCampId)
+  const childLoser = childRatings.get(loserCampId) ?? makeDefaultRating(childId, loserCampId)
+  const overallWinner = overallRatings.get(winnerCampId) ?? makeDefaultRating(null, winnerCampId)
+  const overallLoser = overallRatings.get(loserCampId) ?? makeDefaultRating(null, loserCampId)
+
+  const childElo = computeEloUpdate(childWinner.elo, childLoser.elo)
+  const overallElo = computeEloUpdate(overallWinner.elo, overallLoser.elo)
+
+  const ratingUpdates: RatingUpdate[] = [
+    {
+      child_id: childId,
+      camp_id: winnerCampId,
+      elo: childElo.newWinnerElo,
+      games: childWinner.games + 1,
+      wins: childWinner.wins + 1,
+      losses: childWinner.losses,
+    },
+    {
+      child_id: childId,
+      camp_id: loserCampId,
+      elo: childElo.newLoserElo,
+      games: childLoser.games + 1,
+      wins: childLoser.wins,
+      losses: childLoser.losses + 1,
+    },
+    {
+      child_id: null,
+      camp_id: winnerCampId,
+      elo: overallElo.newWinnerElo,
+      games: overallWinner.games + 1,
+      wins: overallWinner.wins + 1,
+      losses: overallWinner.losses,
+    },
+    {
+      child_id: null,
+      camp_id: loserCampId,
+      elo: overallElo.newLoserElo,
+      games: overallLoser.games + 1,
+      wins: overallLoser.wins,
+      losses: overallLoser.losses + 1,
+    },
+  ]
+
+  // Build optimistic in-memory updated maps
+  const updatedChildRatings = new Map(childRatings)
+  const updatedOverallRatings = new Map(overallRatings)
+
+  updatedChildRatings.set(winnerCampId, {
+    ...childWinner,
+    ...ratingUpdates[0],
+    updated_at: new Date().toISOString(),
+  })
+  updatedChildRatings.set(loserCampId, {
+    ...childLoser,
+    ...ratingUpdates[1],
+    updated_at: new Date().toISOString(),
+  })
+  updatedOverallRatings.set(winnerCampId, {
+    ...overallWinner,
+    ...ratingUpdates[2],
+    updated_at: new Date().toISOString(),
+  })
+  updatedOverallRatings.set(loserCampId, {
+    ...overallLoser,
+    ...ratingUpdates[3],
+    updated_at: new Date().toISOString(),
+  })
+
+  const pendingVote: PendingVote = {
+    id: crypto.randomUUID(),
+    session_id: sessionId,
+    child_id: childId,
+    left_camp_id: leftCampId,
+    right_camp_id: rightCampId,
+    winner_camp_id: winnerCampId,
+    loser_camp_id: loserCampId,
+    ratings: ratingUpdates,
+    created_at: new Date().toISOString(),
+  }
+
+  if (!navigator.onLine) {
+    enqueueVote(pendingVote)
+  } else {
+    await persistVote(pendingVote)
+  }
+
+  return { updatedChildRatings, updatedOverallRatings }
+}
+
+async function persistVote(vote: PendingVote): Promise<void> {
+  // Insert the vote record
+  const { error: voteError } = await supabase.from('votes').insert({
+    id: vote.id,
+    session_id: vote.session_id,
+    child_id: vote.child_id,
+    left_camp_id: vote.left_camp_id,
+    right_camp_id: vote.right_camp_id,
+    winner_camp_id: vote.winner_camp_id,
+    loser_camp_id: vote.loser_camp_id,
+    created_at: vote.created_at,
+  })
+
+  if (voteError) {
+    // Queue for later if network error
+    enqueueVote(vote)
+    console.warn('Vote insert failed, queued offline:', voteError.message)
+    return
+  }
+
+  // Upsert ratings
+  for (const r of vote.ratings) {
+    const { error } = await supabase.from('camp_ratings').upsert(
+      {
+        child_id: r.child_id,
+        camp_id: r.camp_id,
+        elo: r.elo,
+        games: r.games,
+        wins: r.wins,
+        losses: r.losses,
+        updated_at: new Date().toISOString(),
+      },
+      { onConflict: 'child_id,camp_id' },
+    )
+    if (error) {
+      console.warn('Rating upsert warning:', error.message)
+    }
+  }
+}
+
+/**
+ * Sync any offline-queued votes once the device comes back online.
+ */
+export async function syncOfflineQueue(): Promise<void> {
+  const queue = getPendingVotes()
+  if (queue.length === 0) return
+
+  for (const vote of queue) {
     try {
-      const parsed = JSON.parse(stored);
-      if (parsed.access_token && parsed.user_id) {
-        setAuth(parsed.access_token, parsed.user_id);
-        // Try to verify the session is still valid
-        const res = await apiFetch<{ plots: unknown[] }>('/api/state');
-        if (res.ok) {
-          return { userId: parsed.user_id, token: parsed.access_token };
-        }
-        // Session expired, clear and re-auth
-        localStorage.removeItem('city_auth');
-      }
-    } catch {
-      localStorage.removeItem('city_auth');
+      await persistVote(vote)
+      removeVote(vote.id)
+    } catch (err) {
+      console.warn('Sync failed for vote', vote.id, err)
+      break // stop on first failure; retry next time
     }
   }
-
-  const res = await apiFetch<{ access_token: string; refresh_token: string; user_id: string }>(
-    '/api/auth/anon',
-    { method: 'POST' }
-  );
-
-  if (res.ok && res.data) {
-    setAuth(res.data.access_token, res.data.user_id);
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('city_auth', JSON.stringify(res.data));
-    }
-    return { userId: res.data.user_id, token: res.data.access_token };
-  }
-
-  return null;
 }
 
-export const api = {
-  getState: () => apiFetch('/api/state'),
+/**
+ * Recent matchups for this child, fetched from DB.
+ * Returns pairs as [left_camp_id, right_camp_id].
+ */
+export async function fetchRecentMatchups(
+  childId: string,
+  limit = 10,
+): Promise<Array<[string, string]>> {
+  const { data, error } = await supabase
+    .from('votes')
+    .select('left_camp_id, right_camp_id')
+    .eq('child_id', childId)
+    .order('created_at', { ascending: false })
+    .limit(limit)
 
-  placeBuilding: (x: number, y: number, building_type: string) =>
-    apiFetch('/api/place', { method: 'POST', body: JSON.stringify({ x, y, building_type }) }),
+  if (error) return []
+  return (data as { left_camp_id: string; right_camp_id: string }[]).map(
+    (r) => [r.left_camp_id, r.right_camp_id],
+  )
+}
 
-  upgradeBuilding: (x: number, y: number) =>
-    apiFetch('/api/upgrade', { method: 'POST', body: JSON.stringify({ x, y }) }),
+// ─── Helpers ──────────────────────────────────────────────────────────────────
 
-  sendChat: (content: string) =>
-    apiFetch('/api/chat', { method: 'POST', body: JSON.stringify({ content }) }),
-
-  getChat: (before?: string) =>
-    apiFetch(`/api/chat${before ? `?before=${before}` : ''}`),
-
-  reportMessage: (message_id: string, reason?: string) =>
-    apiFetch('/api/chat/report', { method: 'POST', body: JSON.stringify({ message_id, reason }) }),
-
-  getProjects: () => apiFetch('/api/projects'),
-
-  voteProject: (project_id: string) =>
-    apiFetch('/api/projects/vote', { method: 'POST', body: JSON.stringify({ project_id }) }),
-
-  contributeProject: (project_id: string, coins: number, wood: number, stone: number) =>
-    apiFetch('/api/projects/contribute', {
-      method: 'POST',
-      body: JSON.stringify({ project_id, coins, wood, stone }),
-    }),
-};
+function makeDefaultRating(
+  childId: string | null,
+  campId: string,
+): CampRating {
+  return {
+    id: '',
+    child_id: childId,
+    camp_id: campId,
+    elo: ELO_DEFAULT,
+    games: 0,
+    wins: 0,
+    losses: 0,
+    updated_at: new Date().toISOString(),
+  }
+}
