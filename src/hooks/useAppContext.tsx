@@ -166,6 +166,9 @@ export function AppProvider({ children: reactChildren }: { children: React.React
         [leftCamp.id, rightCamp.id] as [string, string],
       ].slice(-10)
 
+      // Keep a local reference so pickPair uses fresh ratings even before
+      // React flushes the setChildRatings state update.
+      let latestChildRatings = childRatings
       try {
         const result = await recordVote({
           sessionId,
@@ -177,6 +180,7 @@ export function AppProvider({ children: reactChildren }: { children: React.React
           overallRatings,
         })
 
+        latestChildRatings = result.updatedChildRatings
         setChildRatings(result.updatedChildRatings)
         setOverallRatings(result.updatedOverallRatings)
       } catch (err) {
@@ -187,7 +191,7 @@ export function AppProvider({ children: reactChildren }: { children: React.React
       await new Promise((r) => setTimeout(r, 500))
       setSelectedCampId(null)
 
-      const nextPair = pickPair(camps, childRatings, recentMatchupsRef.current)
+      const nextPair = pickPair(camps, latestChildRatings, recentMatchupsRef.current)
       setCurrentPair(nextPair)
     },
     [
