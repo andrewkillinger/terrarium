@@ -1,0 +1,435 @@
+/* ─── Reset & base ─────────────────────────────────────────────────────────── */
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+:root {
+  --color-bg: #f0fdf4;
+  --color-surface: #ffffff;
+  --color-border: #d1fae5;
+  --color-primary: #16a34a;
+  --color-primary-dark: #15803d;
+  --color-primary-light: #dcfce7;
+  --color-text: #1a2e1a;
+  --color-text-muted: #64748b;
+  --color-me: #3b82f6;
+  --color-ecke: #f59e0b;
+  --color-gc: #8b5cf6;
+  --color-win: #22c55e;
+  --radius-card: 16px;
+  --radius-badge: 6px;
+  --shadow-card: 0 2px 16px rgba(0,0,0,0.10);
+  --shadow-card-hover: 0 6px 28px rgba(0,0,0,0.16);
+  font-size: 16px;
+}
+
+html, body, #root {
+  height: 100%;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+  background: var(--color-bg);
+  color: var(--color-text);
+  -webkit-font-smoothing: antialiased;
+  overscroll-behavior: none;
+}
+
+button {
+  cursor: pointer;
+  border: none;
+  background: none;
+  font: inherit;
+}
+
+img {
+  display: block;
+  max-width: 100%;
+}
+
+/* ─── Layout ────────────────────────────────────────────────────────────────── */
+.app-shell {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  max-width: 480px;
+  margin: 0 auto;
+}
+
+/* ─── Top bar ───────────────────────────────────────────────────────────────── */
+.top-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  background: var(--color-surface);
+  border-bottom: 1px solid var(--color-border);
+  flex-shrink: 0;
+  gap: 8px;
+}
+
+.top-bar__title {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--color-primary);
+  letter-spacing: -0.02em;
+  flex-shrink: 0;
+}
+
+.top-bar__actions {
+  display: flex;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.icon-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  background: var(--color-primary-light);
+  color: var(--color-primary);
+  font-size: 1.2rem;
+  transition: background 0.15s;
+}
+
+.icon-btn:hover {
+  background: var(--color-border);
+}
+
+/* ─── Segmented control ─────────────────────────────────────────────────────── */
+.segmented {
+  display: flex;
+  background: var(--color-primary-light);
+  border-radius: 10px;
+  padding: 3px;
+  gap: 2px;
+  flex: 1;
+}
+
+.segmented__btn {
+  flex: 1;
+  padding: 7px 10px;
+  border-radius: 8px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--color-text-muted);
+  transition: background 0.15s, color 0.15s;
+  white-space: nowrap;
+}
+
+.segmented__btn--active {
+  background: var(--color-surface);
+  color: var(--color-primary);
+  box-shadow: 0 1px 4px rgba(0,0,0,0.1);
+}
+
+/* ─── Main voting area ──────────────────────────────────────────────────────── */
+.vote-screen {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  padding: 16px;
+  gap: 12px;
+  overflow: hidden;
+}
+
+.vote-prompt {
+  text-align: center;
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--color-text-muted);
+}
+
+.vote-cards {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  flex: 1;
+}
+
+/* On wider screens, show side by side */
+@media (min-width: 400px) and (min-height: 600px) {
+  .vote-cards {
+    flex-direction: row;
+  }
+}
+
+/* ─── Camp card ─────────────────────────────────────────────────────────────── */
+.camp-card {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  background: var(--color-surface);
+  border-radius: var(--radius-card);
+  border: 2px solid transparent;
+  box-shadow: var(--shadow-card);
+  overflow: hidden;
+  transition: box-shadow 0.15s, border-color 0.15s, transform 0.12s;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  user-select: none;
+  min-height: 180px;
+}
+
+.camp-card:active {
+  transform: scale(0.97);
+}
+
+.camp-card--selected {
+  border-color: var(--color-win);
+  box-shadow: 0 0 0 3px rgba(34,197,94,0.25), var(--shadow-card-hover);
+  animation: pulse-selected 0.4s ease;
+}
+
+@keyframes pulse-selected {
+  0%   { transform: scale(1); }
+  30%  { transform: scale(1.03); }
+  100% { transform: scale(1); }
+}
+
+.camp-card__image-wrap {
+  position: relative;
+  width: 100%;
+  height: 130px;
+  background: var(--color-primary-light);
+  overflow: hidden;
+}
+
+.camp-card__image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.camp-card__image-placeholder {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 3rem;
+}
+
+.camp-card__badge {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+}
+
+.camp-card__body {
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex: 1;
+}
+
+.camp-card__name {
+  font-size: 1.05rem;
+  font-weight: 700;
+  line-height: 1.2;
+  color: var(--color-text);
+}
+
+.camp-card__desc {
+  font-size: 0.82rem;
+  color: var(--color-text-muted);
+  line-height: 1.3;
+}
+
+/* ─── Location badge ────────────────────────────────────────────────────────── */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border-radius: var(--radius-badge);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #fff;
+}
+
+.badge--ME   { background: var(--color-me); }
+.badge--ECKE { background: var(--color-ecke); }
+.badge--GC   { background: var(--color-gc); }
+
+/* ─── VS divider ────────────────────────────────────────────────────────────── */
+.vs-divider {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  font-size: 1.2rem;
+  font-weight: 800;
+  color: var(--color-primary);
+  height: 28px;
+}
+
+/* ─── Leaderboard ───────────────────────────────────────────────────────────── */
+.leaderboard-screen {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.leaderboard-tabs {
+  display: flex;
+  border-bottom: 2px solid var(--color-border);
+  flex-shrink: 0;
+}
+
+.leaderboard-tabs__btn {
+  flex: 1;
+  padding: 12px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--color-text-muted);
+  border-bottom: 2px solid transparent;
+  margin-bottom: -2px;
+  transition: color 0.15s, border-color 0.15s;
+}
+
+.leaderboard-tabs__btn--active {
+  color: var(--color-primary);
+  border-bottom-color: var(--color-primary);
+}
+
+.leaderboard-list {
+  flex: 1;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  padding: 8px 0;
+}
+
+.leaderboard-row {
+  display: flex;
+  align-items: center;
+  padding: 12px 16px;
+  gap: 12px;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.leaderboard-row:last-child {
+  border-bottom: none;
+}
+
+.leaderboard-rank {
+  font-size: 1rem;
+  font-weight: 800;
+  color: var(--color-text-muted);
+  width: 28px;
+  flex-shrink: 0;
+  text-align: center;
+}
+
+.leaderboard-rank--top {
+  color: var(--color-primary);
+}
+
+.leaderboard-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.leaderboard-name {
+  font-size: 0.95rem;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.leaderboard-sub {
+  font-size: 0.78rem;
+  color: var(--color-text-muted);
+  margin-top: 2px;
+}
+
+.leaderboard-elo {
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--color-primary);
+  flex-shrink: 0;
+}
+
+/* ─── Offline banner ────────────────────────────────────────────────────────── */
+.offline-banner {
+  background: #fef3c7;
+  color: #92400e;
+  font-size: 0.82rem;
+  font-weight: 600;
+  padding: 8px 16px;
+  text-align: center;
+  flex-shrink: 0;
+}
+
+/* ─── Loading / error states ────────────────────────────────────────────────── */
+.state-screen {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 32px;
+  gap: 16px;
+  text-align: center;
+}
+
+.state-screen__icon {
+  font-size: 3rem;
+}
+
+.state-screen__title {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--color-text);
+}
+
+.state-screen__sub {
+  font-size: 0.88rem;
+  color: var(--color-text-muted);
+}
+
+.btn-primary {
+  padding: 12px 24px;
+  background: var(--color-primary);
+  color: #fff;
+  border-radius: 12px;
+  font-size: 1rem;
+  font-weight: 700;
+  transition: background 0.15s;
+}
+
+.btn-primary:hover {
+  background: var(--color-primary-dark);
+}
+
+.spinner {
+  width: 40px;
+  height: 40px;
+  border: 4px solid var(--color-border);
+  border-top-color: var(--color-primary);
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+/* ─── Sync indicator ────────────────────────────────────────────────────────── */
+.sync-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #f59e0b;
+  display: inline-block;
+  margin-left: 4px;
+}

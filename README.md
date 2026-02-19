@@ -1,173 +1,220 @@
-# Shared City Builder
+# 🏕️ Camp Picks
 
-A persistent multiplayer city builder web app. One shared city — everyone builds together.
+A mobile-first "This or That" app that helps parents discover which summer camps each child prefers using pairwise comparisons and Elo ratings.
 
-## Stack
+---
 
-- **Next.js** (App Router) + TypeScript + Tailwind CSS
-- **Supabase** (Postgres + Realtime + Anonymous Auth)
-- **Vercel** (hosting + Cron for economy ticks)
+## How it works
 
-## Features
+1. Select a child (Marlow or Violet) using the tab at the top.
+2. Two camp cards appear. Tap the one your child prefers.
+3. The app records the vote and immediately loads the next pair.
+4. Elo ratings update after every vote.
+5. Check the Leaderboard (🏆) to see each child's ranked preferences.
 
-- **30x30 shared city grid** — all visitors see and build in the same world
-- **Anonymous auth** — durable per device via Supabase anonymous sign-in
-- **6 building types**: House, Lumber Mill, Quarry, Market, Town Hall, Park
-- **Economy tick** every 5 minutes (via Vercel Cron) — produces resources based on buildings
-- **Park adjacency bonus** — Houses adjacent to Parks get +50% coin production per park level
-- **Plot cooldown** — 60s anti-griefing cooldown on replacements
-- **Community projects** — resource contribution goals and voting
-- **Global chat** with rate limiting (1 msg/3s) and moderation (report, admin soft-delete)
-- **Realtime updates** via Supabase Realtime (plots, city state, chat, activity)
-- **Admin tools** gated behind `ADMIN_KEY`
-- **Mobile-first UI** with pan/zoom city grid, bottom sheet, tab navigation
+Votes are queued offline if there's no internet and synced when reconnected.
 
-## Setup
+---
 
-### 1. Create a Supabase project
+## Tech stack
 
-1. Go to [supabase.com](https://supabase.com) and create a new project
-2. In the SQL Editor, run the contents of `supabase/schema.sql`
-3. Enable Anonymous Sign-ins: Go to Authentication > Providers > Anonymous and toggle it on
-4. Enable Realtime: The schema already adds tables to the `supabase_realtime` publication
+- **React 18 + TypeScript + Vite** — UI
+- **React Router v6** — client-side routing (`/` and `/leaderboard`)
+- **Supabase JS v2** — backend (Postgres + RLS)
+- **Vitest** — unit tests
+- **GitHub Actions** — CI/CD to GitHub Pages
 
-### 2. Environment variables
+---
 
-Copy the example env file:
+## Local development
+
+### Prerequisites
+
+- Node 18+
+- A Supabase project (free tier works)
+
+### 1. Clone and install
 
 ```bash
-cp .env.local.example .env.local
+git clone <repo-url>
+cd terrarium
+npm install
 ```
 
-Fill in your values:
-
-| Variable | Description |
-|---|---|
-| `NEXT_PUBLIC_SUPABASE_URL` | Your Supabase project URL |
-| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Supabase anon/public key |
-| `SUPABASE_SERVICE_ROLE_KEY` | Supabase service role key (server-only) |
-| `ADMIN_KEY` | Secret key for admin API endpoints |
-| `CRON_SECRET` | Secret for Vercel Cron authorization |
-
-### 3. Local development
+### 2. Configure environment
 
 ```bash
-npm install
+cp .env.example .env.local
+```
+
+Edit `.env.local`:
+
+```
+VITE_SUPABASE_URL=https://your-project-id.supabase.co
+VITE_SUPABASE_ANON_KEY=your-anon-key
+VITE_BASE_PATH=/
+```
+
+Find these in your Supabase dashboard → **Project Settings → API**.
+
+### 3. Run locally
+
+```bash
 npm run dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000).
+Open http://localhost:5173
 
-### 4. Run tests
+---
+
+## Supabase setup
+
+### Run migrations
+
+In the Supabase dashboard → **SQL Editor**, run the following files **in order**:
+
+1. `supabase/migrations/001_initial_schema.sql` — creates tables and RLS policies
+2. `supabase/migrations/002_seed.sql` — inserts Marlow, Violet, and all 27 camps
+
+Alternatively, if using the Supabase CLI:
 
 ```bash
-npm test
+supabase db push
+# or
+supabase migration up
 ```
 
-## Deployment (Vercel)
+### Verify
 
-1. Push this repo to GitHub
-2. Import the repo in [Vercel](https://vercel.com)
-3. Add all environment variables in the Vercel dashboard
-4. The `vercel.json` configures a cron job to hit `/api/tick` every 5 minutes
-5. Set `CRON_SECRET` in Vercel — Vercel automatically sends it as `Authorization: Bearer <secret>`
-6. Deploy!
+After running migrations, confirm in **Table Editor**:
 
-## API Routes
+- `children`: 2 rows (Marlow, Violet)
+- `camps`: 27 rows (13 ME, 13 ECKE, 1 GC)
+- `camp_ratings`: empty (rows are created on first app load via upsert)
+- `votes`: empty
 
-| Method | Path | Description |
-|---|---|---|
-| POST | `/api/auth/anon` | Anonymous sign-in |
-| GET | `/api/state` | Full game state (plots, city_state, projects) |
-| POST | `/api/place` | Place a building |
-| POST | `/api/upgrade` | Upgrade a building |
-| POST/GET | `/api/tick` | Economy tick (cron/admin only) |
-| GET | `/api/chat` | Fetch chat messages (paginated) |
-| POST | `/api/chat` | Send a chat message |
-| POST | `/api/chat/report` | Report a chat message |
-| GET | `/api/projects` | List projects |
-| POST | `/api/projects/vote` | Vote on a project |
-| POST | `/api/projects/contribute` | Contribute resources to a project |
-| POST | `/api/admin` | Admin actions |
+### RLS policies (summary)
 
-### Admin Actions
+| Table | Policy |
+|---|---|
+| `camps` | Public SELECT (active only) |
+| `children` | Public SELECT |
+| `camp_ratings` | Public SELECT, INSERT, UPDATE |
+| `votes` | Public SELECT, INSERT |
 
-Send POST to `/api/admin` with header `x-admin-key: YOUR_ADMIN_KEY`:
+### Adding camp photos
 
-```json
-{ "action": "create_project", "title": "Build a Library", "project_type": "resource_goal", "goal_wood": 500, "goal_stone": 300 }
-{ "action": "protect_plot", "x": 15, "y": 15 }
-{ "action": "unprotect_plot", "x": 15, "y": 15 }
-{ "action": "delete_chat_message", "message_id": "uuid" }
-{ "action": "toggle_slow_mode", "enabled": true, "interval_seconds": 10 }
-{ "action": "force_complete_project", "project_id": "uuid" }
-{ "action": "revert_actions", "count": 5 }
+Image URLs are empty by default. To add photos:
+
+1. Upload images to Supabase Storage or any CDN.
+2. Update the `image_url` column in the `camps` table.
+
+The app gracefully falls back to emoji placeholders when `image_url` is empty or fails to load.
+
+---
+
+## GitHub Pages deployment
+
+### 1. Enable GitHub Pages
+
+In your repo → **Settings → Pages**:
+- Source: **GitHub Actions**
+
+### 2. Set repository secrets
+
+In **Settings → Secrets and variables → Actions**:
+
+| Secret | Value |
+|---|---|
+| `VITE_SUPABASE_URL` | Your Supabase project URL |
+| `VITE_SUPABASE_ANON_KEY` | Your Supabase anon key |
+
+In **Settings → Secrets and variables → Actions → Variables**:
+
+| Variable | Value |
+|---|---|
+| `VITE_BASE_PATH` | `/terrarium/` (replace `terrarium` with your repo name) |
+
+### 3. Push to main/master
+
+The GitHub Actions workflow (`.github/workflows/deploy.yml`) will:
+
+1. Run unit tests
+2. Build the Vite app with correct base path
+3. Deploy `dist/` to GitHub Pages
+
+Your app will be available at:
+```
+https://<username>.github.io/<repo-name>/
 ```
 
-## Buildings
+---
 
-| Type | Max Level | Production (per level) | Special |
-|---|---|---|---|
-| House | 5 | +2 coins/lvl, +pop | Park adjacency bonus |
-| Lumber Mill | 5 | +3+2/lvl wood | — |
-| Quarry | 5 | +3+2/lvl stone | — |
-| Market | 3 | +5+5/lvl coins | — |
-| Town Hall | 3 | All resources + pop | — |
-| Park | 3 | Population only | Boosts adjacent Houses |
+## Running tests
 
-## Security
+```bash
+npm test          # run once
+npm run test:watch  # watch mode
+```
 
-- All mutations are server-side (Next.js route handlers)
-- Supabase RLS: public read, no client direct writes
-- Service role key is never exposed to the browser
-- Server validates costs, cooldowns, and rate limits
-- Plot cooldown prevents griefing (60s between replacements)
+Tests cover:
+- Elo math: `expectedScore`, `computeEloUpdate`
+- Pairing logic: `pickPair`
 
-## Data Model
+---
 
-- `plots` — 30x30 grid with building info
-- `city_state` — singleton resource/population tracker
-- `actions_log` — append-only activity feed
-- `projects` / `votes` / `project_contributions` — community projects
-- `chat_messages` / `chat_reports` — global chat
-- `app_settings` — admin config (e.g., slow mode)
-
-## Project Structure
+## Project structure
 
 ```
 src/
-  app/
-    api/          # Server-side API routes
-      admin/      # Admin actions
-      auth/anon/  # Anonymous auth
-      chat/       # Chat + report
-      place/      # Place building
-      projects/   # Projects, vote, contribute
-      state/      # Full game state
-      tick/       # Economy tick (cron)
-      upgrade/    # Upgrade building
-    layout.tsx    # Root layout
-    page.tsx      # Main page (renders GameApp)
-    globals.css   # Global styles
-  components/     # React UI components
-    GameApp.tsx   # Main app shell with tab navigation
-    CityGrid.tsx  # Pan/zoom city grid
-    PlotSheet.tsx # Bottom sheet for plot actions
-    ResourceBar.tsx # Top resource display
-    ChatPanel.tsx # Global chat
-    ProjectsPanel.tsx # Community projects
-    ActivityPanel.tsx # Recent activity feed
-    StatsPanel.tsx    # City statistics
+  __tests__/       Unit tests
+  components/      Reusable UI components
+    CampCard.tsx
+    ChildSelector.tsx
+    LocationBadge.tsx
+    TopBar.tsx
   hooks/
-    useGameState.ts # Main game state hook with realtime
+    useAppContext.tsx   Global state + data fetching
   lib/
-    api.ts        # Client-side API helpers
-    auth.ts       # Server-side auth helpers
-    buildings.ts  # Building definitions, game logic
-    types.ts      # TypeScript types
-    supabase/
-      client.ts   # Browser Supabase client
-      server.ts   # Server Supabase client (service role)
+    api.ts         Supabase data access + vote recording
+    elo.ts         Elo rating math
+    offlineQueue.ts  localStorage offline vote queue
+    pairing.ts     Smart random pair selection
+    session.ts     Device session ID
+    supabase.ts    Supabase client
+  pages/
+    VotePage.tsx
+    LeaderboardPage.tsx
+  types/
+    index.ts       Shared TypeScript types
+  App.tsx
+  main.tsx
+  index.css
 supabase/
-  schema.sql      # Full database schema
+  migrations/
+    001_initial_schema.sql
+    002_seed.sql
+.github/
+  workflows/
+    deploy.yml
 ```
+
+---
+
+## Configuration
+
+| Constant | Location | Default | Notes |
+|---|---|---|---|
+| Elo K-factor | `src/lib/elo.ts` | `24` | Higher = more volatile ratings |
+| Default Elo | `src/lib/elo.ts` | `1000` | Starting rating for all camps |
+| Repeat window | `src/lib/pairing.ts` | `10` | Avoid repeating last N matchups |
+
+---
+
+## Known limitations / future work
+
+- No admin UI for editing camps (add/edit via Supabase dashboard)
+- No undo for votes
+- No authentication — anyone with the URL can vote
+- Rating updates are not atomic (race conditions tolerated for MVP)
+- Camp images require manual URL entry
