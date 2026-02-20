@@ -14,6 +14,10 @@ create table if not exists public.rating_archives (
 
 alter table public.rating_archives enable row level security;
 
+-- Drop and recreate policies so the script is safe to run more than once.
+drop policy if exists "Public can read archives"  on public.rating_archives;
+drop policy if exists "Public can insert archives" on public.rating_archives;
+
 create policy "Public can read archives"
   on public.rating_archives for select
   using (true);
@@ -35,14 +39,22 @@ as $$
 $$;
 
 -- ─── votes: allow delete for full reset ──────────────────────────────────────
+drop policy if exists "Public can delete votes" on public.votes;
+
 create policy "Public can delete votes"
   on public.votes for delete
   using (true);
 
 -- ─── Supabase Realtime for camp_ratings ──────────────────────────────────────
 -- Adds camp_ratings to the supabase_realtime publication so UPDATE events
--- are broadcast to subscribed clients.
-alter publication supabase_realtime add table public.camp_ratings;
+-- are broadcast to subscribed clients. The DO block skips the error if the
+-- table is already a member of the publication.
+do $$
+begin
+  alter publication supabase_realtime add table public.camp_ratings;
+exception
+  when duplicate_object then null;
+end $$;
 
 -- REPLICA IDENTITY FULL ensures the full row (all columns) is included in the
 -- WAL entry for UPDATE events, so payload.new contains elo/games/wins/losses.
