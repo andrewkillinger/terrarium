@@ -4,13 +4,17 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
-    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
-    <meta name="theme-color" content="#22c55e" />
-    <title>Camp Picks</title>
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="theme-color" content="#1b1f2a" />
+    <title>Terrarium Sandbox</title>
     <link rel="icon" type="image/svg+xml" href="./favicon.svg" />
   </head>
   <body>
-    <div id="root"></div>
-    <script type="module" src="/src/main.tsx"></script>
+    <div id="app">
+      <canvas id="game"></canvas>
+      <aside id="ui"></aside>
+      <div id="hint">Left-click to paint &middot; Right-click to erase &middot; Space pause &middot; C clear &middot; [ ] brush</div>
+    </div>
+    <script type="module" src="/src/main.ts"></script>
   </body>
 </html>
